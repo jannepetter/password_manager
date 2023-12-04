@@ -1,6 +1,6 @@
 
 
-def read_data():
+def read_data(key):
     """
     Reads data from db and returns a list of user stored passwords with their ids.
     Could be a list of tuples [(id,description,password)] or something else.

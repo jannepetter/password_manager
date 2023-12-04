@@ -1,7 +1,322 @@
+import ttkbootstrap as ttk
+import ttkbootstrap.constants as bconst
+from handle_data import login, read_data
+import pyperclip
 
-#  create the functionality for the UI, what was in the initial plan.
+def create_button(text,call_back):
+    btn = ttk.Button(
+        text=text,
+        command=call_back
+    )
+    return btn
 
-class UI:
+class SubPage(ttk.Frame):
+    def __init__(self, master, switch_page_callback):
+        super().__init__(master)
+        self.master = master
+        self.switch_page_callback = switch_page_callback
 
-    def __init__(self) -> None:
+    def create_buttonbox(self):
+        """Submit and cancel buttons for forms"""
+        container = ttk.Frame(self)
+        container.pack(expand=bconst.YES, pady=(15, 10))
+
+        sub_btn = ttk.Button(
+            master=container,
+            text="Submit",
+            command=self.on_submit,
+            bootstyle=bconst.SUCCESS,
+            width=6,
+        )
+        sub_btn.pack(side=bconst.RIGHT, padx=5)
+        sub_btn.focus_set()
+
+        cnl_btn = ttk.Button(
+            master=container,
+            text="Cancel",
+            command=self.on_cancel,
+            bootstyle=bconst.DANGER,
+            width=6,
+        )
+        cnl_btn.pack(side=bconst.RIGHT, padx=5)
+
+
+    def create_form_entry(self,master, label, variable,type_password=False, width=20,buttons=[],anchor="center"):
+        """Create a single form entry"""
+        container = ttk.Frame(master)
+        container.pack(anchor=anchor,pady=5)
+
+        lbl = ttk.Label(master=container, text=label, width=10)
+        lbl.pack(anchor="nw", padx=5)
+
+        ent = ttk.Entry(master=container, textvariable=variable,width=width)
+        if type_password:
+            ent = ttk.Entry(master=container, textvariable=variable,show="*",width=width)
+
+        ent.pack(side=bconst.LEFT, padx=5)
+        for el in buttons:
+            el.pack(in_=container, side=bconst.LEFT, padx=5)
+
+        return ent
+
+    def on_submit(self):
         pass
+
+    def on_cancel(self):
+        pass
+
+
+class LoginPage(SubPage):
+    def __init__(self, master, switch_page_callback):
+        super().__init__(master, switch_page_callback)
+
+        self.label = ttk.Label(self, text="Login to your password manager!")
+        self.label.pack(pady=15)
+
+        self.username = ttk.StringVar(value="")
+        self.password = ttk.StringVar(value="")
+
+        self.create_form_entry(self,"Username", self.username)
+        self.create_form_entry(self,"Password", self.password,type_password=True)
+        self.create_buttonbox()
+
+    def on_submit(self):
+        """Print the contents to console and return the values."""
+        print("Name:", self.username.get())
+        print("Password:", self.password.get())
+        # send username and password to handle_data login
+        self.master.key = login()
+        self.master.key = "key_from_successful_login"
+
+        # Trigger a move to data page if successful login
+        self.show_data_page()
+
+    def on_cancel(self):
+        """Cancel and close the application."""
+        self.quit()
+
+    def show_data_page(self):
+        self.switch_page_callback(DataPanel)
+
+ 
+
+class DataPanel(SubPage):
+    def __init__(self, master, switch_page_callback):
+        super().__init__(master, switch_page_callback)
+
+
+        self.button_frame = ttk.Frame(self)
+        self.button_frame.grid(row=0, column=0, padx=10, pady=10, sticky="n")
+
+        # Create a frame for details
+        self.details_frame = ttk.Frame(self)
+        self.details_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+        anchor = "nw"
+
+        self.entry_description_var = ttk.StringVar(value="")
+        copy_desc_btn = create_button(
+            "copy",
+            lambda:self.copy_to_clipboard(self.entry_description_var.get())
+            )
+        self.create_form_entry(
+            self.details_frame,
+            "Description",
+            self.entry_description_var,
+            buttons=[copy_desc_btn],
+            anchor=anchor,
+            )
+
+        self.entry_username_var = ttk.StringVar(value="")
+        copy_uname_btn = create_button(
+            "copy",
+            lambda:self.copy_to_clipboard(self.entry_username_var.get())
+            )
+        self.create_form_entry(
+            self.details_frame,
+            "Username",self.entry_username_var,
+            buttons=[copy_uname_btn],
+            anchor=anchor,
+            )
+
+        self.entry_password_var = ttk.StringVar(value="")
+        copy_passw_btn = create_button(
+            "copy",
+            lambda:self.copy_to_clipboard(self.entry_password_var.get())
+        )
+        toggle_show_passw_btn = create_button(
+            "show",
+            lambda:self.toggle_show_entry_password()
+            )
+        self.password_entry = self.create_form_entry(
+            self.details_frame,
+            "Password",
+            self.entry_password_var,
+            type_password=True,
+            buttons=[
+                copy_passw_btn,
+                toggle_show_passw_btn
+                ],
+            anchor=anchor,
+            )
+
+        # print('master key--', self.master.key)
+        # self.data_list = read_data(self.master.key)
+
+        # read data using self.master.key. Here is static data for example
+        self.data_list = [
+            {
+                "description":"to moodle",
+                "password":"some_password",
+                "username":"some_username"
+            },
+                        {
+                "description":"to somewhere",
+                "password":"another_password",
+                "username":"another_username"
+            },
+
+        ]
+        self.create_description_list()
+
+    def create_description_list(self):
+        for i, data in enumerate(self.data_list):
+            button = ttk.Button(
+                self.button_frame, 
+                text=data["description"], 
+                command=lambda idx=i: self.show_details(idx),
+                bootstyle=bconst.SECONDARY,
+                width=25,
+                )
+            button.grid(row=i, column=0, sticky="ew", pady=2)
+
+    def show_details(self, index):
+        detail = self.data_list[index]
+        description = detail["description"]
+        username = detail["username"]
+        password = detail["password"]
+        self.entry_description_var.set(description)
+        self.entry_username_var.set(username)
+        self.entry_password_var.set(password)
+
+    
+    def copy_to_clipboard(self,variable):
+        pyperclip.copy(variable)
+
+    def toggle_show_entry_password(self):
+        current_show_state = self.password_entry.cget("show")
+        new_show_state = "" if current_show_state == "*" else "*"
+        self.password_entry.config(show=new_show_state)
+
+
+class Navigation(SubPage):
+    def __init__(self, master, switch_page_callback):
+        super().__init__(master, switch_page_callback)
+        # disable nav bar before login
+        # status = bconst.DISABLED
+        status = ""
+        width = 6
+        x_pad = 5
+        y_pad = 5
+        data_button = ttk.Button(
+            self.master, 
+            text="Data", 
+            width=width,
+            state=status,
+            command=lambda: self.switch_page_callback(DataPanel)
+            )
+        data_button.pack(side=bconst.LEFT, padx=x_pad,pady=y_pad)
+
+        add_button = ttk.Button(
+            self.master, 
+            text="Add", 
+            width=width,
+            state=status,
+            command=lambda: self.switch_page_callback(AddDataPage)
+            )
+        add_button.pack(side=bconst.LEFT, padx=x_pad,pady=y_pad)
+
+
+        options_button = ttk.Button(
+            self.master, 
+            text="Options", 
+            width=width,
+            state=status,
+            )
+        options_button.pack(side=bconst.LEFT, padx=x_pad,pady=y_pad)
+
+        logout_button = ttk.Button(
+            self.master, 
+            text="Logout", 
+            width=width,
+            state=status,
+            )
+        logout_button.pack(side=bconst.RIGHT, padx=x_pad,pady=y_pad)
+
+    def some_func(self,page):
+        self.switch_page_callback(page)
+        print('testing',page)
+
+class AddDataPage(SubPage):
+    def __init__(self, master, switch_page_callback):
+        super().__init__(master, switch_page_callback)
+
+        self.label = ttk.Label(self, text="Create a new data entry")
+        self.label.pack(pady=10)
+
+        self.description= ttk.StringVar(value="")
+        self.username = ttk.StringVar(value="")
+        self.password = ttk.StringVar(value="")
+
+        self.create_form_entry(self,"Description", self.description)
+        self.create_form_entry(self,"Username", self.username)
+        self.create_form_entry(self,"Password", self.password,type_password=True)
+        self.create_buttonbox()
+
+
+    def on_submit(self):
+        print('write data to db',self.username.get(), self.password.get())
+
+    def on_cancel(self):
+        self.switch_page_callback(DataPanel)
+
+ 
+
+
+class MainApplication(ttk.Window):
+    def __init__(self, theme):
+        super().__init__(themename=theme)
+        self.title("Password manager")
+        self.geometry("800x400")
+
+        self.navigation_frame = ttk.Frame(self)
+        self.navigation_frame.pack(side=bconst.TOP)
+
+        self.page_frame = ttk.Frame(self)
+        self.page_frame.pack(side=bconst.BOTTOM, fill="both", expand=True)
+
+        self.navigation = Navigation(self, self.switch_page)
+        self.navigation.pack(in_=self.navigation_frame)
+
+        self.current_page = None
+        self.show_page(LoginPage)
+
+    def show_page(self, page_class):
+        new_page = page_class(self, self.switch_page)
+
+        if self.current_page is not None:
+            self.current_page.destroy()
+
+        new_page.pack(in_=self.page_frame, fill="both", expand=True)
+        self.current_page = new_page
+
+    def switch_page(self, page_class):
+        self.show_page(page_class)
+
+    def on_close(self):
+        self.destroy()
+
+
+
+
+
+    
