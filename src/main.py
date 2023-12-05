@@ -3,7 +3,7 @@ from ui import MainApplication
 
 def main():
     """
-    Demo ui
+    First prototype
     """
     app = MainApplication("darkly")
     app.mainloop()

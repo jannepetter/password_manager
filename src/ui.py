@@ -1,6 +1,6 @@
 import ttkbootstrap as ttk
 import ttkbootstrap.constants as bconst
-from handle_data import login, read_data
+from handle_data import login, read_data,write_data, db_init
 import pyperclip
 
 def create_button(text,call_back):
@@ -81,15 +81,15 @@ class LoginPage(SubPage):
         self.create_buttonbox()
 
     def on_submit(self):
-        """Print the contents to console and return the values."""
-        print("Name:", self.username.get())
-        print("Password:", self.password.get())
-        # send username and password to handle_data login
-        self.master.key = login()
-        self.master.key = "key_from_successful_login"
+        """Submits login details"""
 
-        # Trigger a move to data page if successful login
-        self.show_data_page()
+        self.master.key = login(
+            self.password.get(),
+            self.username.get()
+            )
+
+        if self.master.key:
+            self.show_data_page()
 
     def on_cancel(self):
         """Cancel and close the application."""
@@ -159,27 +159,13 @@ class DataPanel(SubPage):
             anchor=anchor,
             )
 
-        # print('master key--', self.master.key)
-        # self.data_list = read_data(self.master.key)
-
-        # read data using self.master.key. Here is static data for example
-        self.data_list = [
-            {
-                "description":"to moodle",
-                "password":"some_password",
-                "username":"some_username"
-            },
-                        {
-                "description":"to somewhere",
-                "password":"another_password",
-                "username":"another_username"
-            },
-
-        ]
+        self.data_list = read_data(self.master.key)
         self.create_description_list()
 
     def create_description_list(self):
+        print('creating--',self.data_list)
         for i, data in enumerate(self.data_list):
+            print('c data--',data)
             button = ttk.Button(
                 self.button_frame, 
                 text=data["description"], 
@@ -274,7 +260,15 @@ class AddDataPage(SubPage):
 
 
     def on_submit(self):
-        print('write data to db',self.username.get(), self.password.get())
+        # TODO: add checks to see that data is valid
+
+        write_data(
+            self.master.key,
+            self.description.get(),
+            self.password.get(),
+            self.username.get()
+            )
+        print('data written in db')
 
     def on_cancel(self):
         self.switch_page_callback(DataPanel)
@@ -285,6 +279,7 @@ class AddDataPage(SubPage):
 class MainApplication(ttk.Window):
     def __init__(self, theme):
         super().__init__(themename=theme)
+        db_init()
         self.title("Password manager")
         self.geometry("800x400")
 
