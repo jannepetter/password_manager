@@ -2,6 +2,7 @@ import ttkbootstrap as ttk
 import ttkbootstrap.constants as bconst
 from handle_data import login, read_data,write_data, db_init
 from ttkbootstrap.scrolled import ScrolledFrame
+from ttkbootstrap.dialogs import Messagebox
 import pyperclip
 
 def create_button(text,call_back):
@@ -73,6 +74,8 @@ class LoginPage(SubPage):
 
         self.label = ttk.Label(self, text="Login to your password manager!")
         self.label.pack(pady=15)
+        self.error_label = ttk.Label(self, text="", foreground="red")
+        self.error_label.pack(pady=2)
 
         self.username = ttk.StringVar(value="")
         self.password = ttk.StringVar(value="")
@@ -91,6 +94,11 @@ class LoginPage(SubPage):
 
         if self.master.key:
             self.show_data_page()
+
+        self.error_label.config(text="Wrong username or password!")
+        self.after(2000, lambda:self.error_label.config(text=""))
+        self.username.set("")
+        self.password.set("")
 
     def on_cancel(self):
         """Cancel and close the application."""
@@ -287,6 +295,12 @@ class AddDataPage(SubPage):
             self.password.get(),
             self.username.get()
             )
+        
+        self.description.set("")
+        self.password.set("")
+        self.username.set("")
+
+        self.label.config(text="New entry added successfully. Add another?")
         print('data written in db')
 
     def on_cancel(self):
@@ -300,7 +314,7 @@ class MainApplication(ttk.Window):
         super().__init__(themename=theme)
         db_init()
         self.title("Password manager")
-        self.geometry("800x400")
+        self.geometry("800x400+100+100")
 
         self.navigation_frame = ttk.Frame(self)
         self.navigation_frame.pack(side=bconst.TOP)
