@@ -1,6 +1,7 @@
 import ttkbootstrap as ttk
 import ttkbootstrap.constants as bconst
 from handle_data import login, read_data,write_data, db_init
+from ttkbootstrap.scrolled import ScrolledFrame
 import pyperclip
 
 def create_button(text,call_back):
@@ -103,15 +104,23 @@ class LoginPage(SubPage):
 class DataPanel(SubPage):
     def __init__(self, master, switch_page_callback):
         super().__init__(master, switch_page_callback)
+        self.search_frame = ttk.Frame(self)
+        self.search_frame.pack(side=bconst.TOP,fill=bconst.X)
+        self.search_var = ttk.StringVar(value="")
+        btn = create_button("search",self.search)
+        self.create_form_entry(self.search_frame,"Search",self.search_var,anchor="w",buttons=[btn])
 
-
-        self.button_frame = ttk.Frame(self)
-        self.button_frame.grid(row=0, column=0, padx=10, pady=10, sticky="n")
+        self.common_frame = ttk.Frame(self)
+        self.common_frame.pack(side=bconst.TOP,fill=bconst.X)
+        self.button_frame = ScrolledFrame(self.common_frame, autohide=True)
+        # self.button_frame.grid(row=0, column=0, padx=5, pady=10)
+        self.button_frame.pack(side=bconst.LEFT,padx=5, fill=bconst.BOTH)
 
         # Create a frame for details
-        self.details_frame = ttk.Frame(self)
-        self.details_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
-        anchor = "nw"
+        self.details_frame = ttk.Frame(self.common_frame)
+        # self.details_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+        self.details_frame.pack(side=bconst.LEFT,padx=30)
+        anchor = "w"
 
         self.entry_description_var = ttk.StringVar(value="")
         copy_desc_btn = create_button(
@@ -163,9 +172,7 @@ class DataPanel(SubPage):
         self.create_description_list()
 
     def create_description_list(self):
-        print('creating--',self.data_list)
         for i, data in enumerate(self.data_list):
-            print('c data--',data)
             button = ttk.Button(
                 self.button_frame, 
                 text=data["description"], 
@@ -192,6 +199,18 @@ class DataPanel(SubPage):
         current_show_state = self.password_entry.cget("show")
         new_show_state = "" if current_show_state == "*" else "*"
         self.password_entry.config(show=new_show_state)
+
+    def search(self):
+        for child in self.button_frame.winfo_children():
+            child.destroy()
+        
+        if self.search_var.get() == "":
+            self.data_list = read_data(self.master.key)
+        else:
+            self.data_list = [
+                x for x in self.data_list if self.search_var.get() in x["description"]
+                ]
+        self.create_description_list()
 
 
 class Navigation(SubPage):
