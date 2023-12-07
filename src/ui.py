@@ -71,7 +71,7 @@ class SubPage(ttk.Frame):
 class LoginPage(SubPage):
     def __init__(self, master, switch_page_callback):
         super().__init__(master, switch_page_callback)
-        self.first_login = True
+        self.first_login = False
         self.label = ttk.Label(self, text="Login to your password manager!")
         self.label.pack(pady=15)
         self.error_label = ttk.Label(self, text="", foreground="red")
@@ -116,6 +116,7 @@ class LoginPage(SubPage):
 
         if self.master.key:
             self.show_data_page()
+            return
 
         error_msg = "Wrong username or password!"
         self.on_error(error_msg)
@@ -141,12 +142,9 @@ class DataPanel(SubPage):
         self.common_frame = ttk.Frame(self)
         self.common_frame.pack(side=bconst.TOP,fill=bconst.X)
         self.button_frame = ScrolledFrame(self.common_frame, autohide=True)
-        # self.button_frame.grid(row=0, column=0, padx=5, pady=10)
         self.button_frame.pack(side=bconst.LEFT,padx=5, fill=bconst.BOTH)
 
-        # Create a frame for details
         self.details_frame = ttk.Frame(self.common_frame)
-        # self.details_frame.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
         self.details_frame.pack(side=bconst.LEFT,padx=30)
         anchor = "w"
 
@@ -285,9 +283,6 @@ class Navigation(SubPage):
             )
         logout_button.pack(side=bconst.RIGHT, padx=x_pad,pady=y_pad)
 
-    def some_func(self,page):
-        self.switch_page_callback(page)
-        print('testing',page)
 
 class AddDataPage(SubPage):
     def __init__(self, master, switch_page_callback):
@@ -321,7 +316,6 @@ class AddDataPage(SubPage):
         self.username.set("")
 
         self.label.config(text="New entry added successfully. Add another?")
-        print('data written in db')
 
     def on_cancel(self):
         self.switch_page_callback(DataPanel)
