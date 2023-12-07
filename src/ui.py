@@ -48,7 +48,7 @@ class SubPage(ttk.Frame):
         container = ttk.Frame(master)
         container.pack(anchor=anchor,pady=5)
 
-        lbl = ttk.Label(master=container, text=label, width=10)
+        lbl = ttk.Label(master=container, text=label, width=15)
         lbl.pack(anchor="nw", padx=5)
 
         ent = ttk.Entry(master=container, textvariable=variable,width=width)
@@ -71,7 +71,7 @@ class SubPage(ttk.Frame):
 class LoginPage(SubPage):
     def __init__(self, master, switch_page_callback):
         super().__init__(master, switch_page_callback)
-
+        self.first_login = True
         self.label = ttk.Label(self, text="Login to your password manager!")
         self.label.pack(pady=15)
         self.error_label = ttk.Label(self, text="", foreground="red")
@@ -82,10 +82,32 @@ class LoginPage(SubPage):
 
         self.create_form_entry(self,"Username", self.username)
         self.create_form_entry(self,"Password", self.password,type_password=True)
+
+        if self.first_login:
+            self.password_confirm = ttk.StringVar(value="")
+            self.create_form_entry(self,"Confirm password",self.password_confirm,True)
+            self.label.config(text="Select your username and password")
+
         self.create_buttonbox()
 
+    def on_error(self,error_msg):
+        """Show error and clear entries."""
+        self.error_label.config(text=error_msg)
+        self.after(2000, lambda:self.error_label.config(text=""))
+        self.username.set("")
+        self.password.set("")
+
     def on_submit(self):
-        """Submits login details"""
+        """Submit the login data."""
+        error_msg = None
+
+        # TODO: validate username and password on first login
+        # required length and complexity for password at least
+        # on first login. Password and confirm password match
+
+        if error_msg:
+            self.on_error(error_msg)
+            return
 
         self.master.key = login(
             self.password.get(),
@@ -95,10 +117,8 @@ class LoginPage(SubPage):
         if self.master.key:
             self.show_data_page()
 
-        self.error_label.config(text="Wrong username or password!")
-        self.after(2000, lambda:self.error_label.config(text=""))
-        self.username.set("")
-        self.password.set("")
+        error_msg = "Wrong username or password!"
+        self.on_error(error_msg)
 
     def on_cancel(self):
         """Cancel and close the application."""
