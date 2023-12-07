@@ -1,6 +1,11 @@
 import ttkbootstrap as ttk
 import ttkbootstrap.constants as bconst
-from handle_data import login, read_data,write_data, db_init
+from handle_data import (
+    login, 
+    read_data,
+    write_data, 
+    db_init,
+    )
 from ttkbootstrap.scrolled import ScrolledFrame
 from ttkbootstrap.dialogs import Messagebox
 import pyperclip
@@ -324,7 +329,9 @@ class AddDataPage(SubPage):
 
 
 class MainApplication(ttk.Window):
-    def __init__(self, theme):
+    def __init__(self, app_config):
+        self.app_config = app_config
+        theme = app_config.get("ui_theme", "darkly")
         super().__init__(themename=theme)
         db_init()
         self.title("Password manager")

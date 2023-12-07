@@ -8,11 +8,17 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import padding
 import os
 import base64
+import json
 
 DB_NAME = "manager.db"
 ENCODING = "utf-8"
 VECTOR_LENGTH = 16
 KEY_ITERATIONS = 5000000
+CONFIG_PATH = "config.json"
+DEFAULT_CONFIG = {
+    "logout":15,
+    "ui_theme":"darkly"
+}
 
 
 def generate_key(password:str, username:str):
@@ -341,3 +347,55 @@ def db_init():
     cursor.execute(CREATE_TABLE_QUERY)
     conn.commit()
     conn.close()
+
+def read_config():
+    """
+    Read application configs.
+    """
+    data = None
+
+    try:
+        with open(CONFIG_PATH, "r") as json_file:
+                
+                data = json.load(json_file)
+
+                if not isinstance(data,dict):
+                    raise ValueError("Config data was not a dict")
+                
+    except Exception:
+            # config.json is not found, damaged, etc.
+            data = DEFAULT_CONFIG
+
+    return data
+
+def save_config(data):
+    """
+    Save configs.
+    """
+    error = None
+    try:
+        if not isinstance(data,dict):
+            raise ValueError("Config data must be a dict. Restoring default config")
+        
+        if "ui_theme" not in data:
+            raise ValueError("Config data must contain ui_theme. Restoring default config")
+        
+        if "logout" not in data:
+            raise ValueError("Config data must contain logout time. Restoring default config")
+        
+        with open(CONFIG_PATH, "w") as json_file:
+            json.dump(data, json_file, indent=4)
+            return error
+
+    except Exception as e:
+        error = e
+        # something went wrong, save default config to recover.
+        with open(CONFIG_PATH, "w") as json_file:
+            json.dump(DEFAULT_CONFIG, json_file, indent=4)
+    
+    return error
+            
+
+
+
+
