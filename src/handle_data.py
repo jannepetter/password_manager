@@ -241,11 +241,13 @@ def change_login_password(username, password, new_username, new_password):
     encryption is also tested with each entry that it matches the original data. Incase it 
     does not, the change of the master password is aborted and rollback occurs.
     """
+    error = ""
     key = generate_key(password,username)
 
     ok = check_master_password_ok(key)
     if not ok:
-        return False
+        error = "Old username and password did not match!"
+        return False,None, error
     
     original_data = read_data(key)
     try:
@@ -297,13 +299,13 @@ def change_login_password(username, password, new_username, new_password):
         conn.commit()
         
     except Exception as e:
-        print('Password change has failed. Rolling back. ',e)
+        error = "Password change failed!"
         conn.rollback()
         conn.close()
-        return False
+        return False, None, error
         
     conn.close()
-    return True
+    return True,new_key, error
 
     
 
@@ -394,6 +396,19 @@ def save_config(data):
             json.dump(DEFAULT_CONFIG, json_file, indent=4)
     
     return error
+
+def check_if_first_login():
+    conn = connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute('''
+        SELECT vector
+        FROM passwords
+    ''')
+    rows = cursor.fetchall()
+    
+    conn.close()
+    return len(rows) == 0
             
 
 

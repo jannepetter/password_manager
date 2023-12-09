@@ -3,7 +3,7 @@ from handle_data import read_config
 
 def main():
     """
-    First prototype
+    Main function.
     """
     app_config = read_config()
     app = MainApplication(app_config)
