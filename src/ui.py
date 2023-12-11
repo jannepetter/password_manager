@@ -1,3 +1,5 @@
+import tkinter as tk
+from tkinter import ttk
 import ttkbootstrap as ttk
 import ttkbootstrap.constants as bconst
 from handle_data import (
@@ -144,7 +146,53 @@ class LoginPage(SubPage):
     def show_data_page(self):
         self.switch_page_callback(DataPanel)
 
- 
+class UpdateWindow(tk.Toplevel):
+    def __init__(self, master):
+        super().__init__(master)
+        self.title("Update Password")
+        self.geometry("400x400")
+
+        # Frame to hold labels and entry widgets
+        frame = ttk.Frame(self)
+        frame.pack(pady=10)
+
+        # Labels and entry widgets
+        labels = ["Current Password:", "New Password:", "Confirm Password:"]
+        self.entries = []
+
+        for label_text in labels:
+            label = ttk.Label(frame, text=label_text)
+            label.grid(row=labels.index(label_text), column=0, padx=3, pady=3)
+
+            entry = ttk.Entry(frame, show="*")
+            entry.grid(row=labels.index(label_text), column=1, padx=3, pady=3)
+            self.entries.append(entry)
+        toggle_buttons = []
+
+        for i in range(len(labels)):
+            button = ttk.Button(frame, text=f"Show", command=lambda idx=i: self.toggle_show_entry_password(idx))
+            button.grid(row=i, column=2, padx=3, pady=3)
+            toggle_buttons.append(button)
+
+        # Submit button
+        submit_button = ttk.Button(self, text="Submit", command=self.on_submit)
+        submit_button.pack(side=tk.LEFT, padx=5, pady=10)
+
+        # Cancel button
+        cancel_button = ttk.Button(self, text="Cancel", command=self.destroy)
+        cancel_button.pack(side=tk.RIGHT, padx=5, pady=10)
+
+    def toggle_show_entry_password(self, index):
+        current_show_state = self.entries[index].cget("show")
+        new_show_state = "" if current_show_state == "*" else "*"
+        self.entries[index].config(show=new_show_state)
+
+    def on_submit(self):
+        # TODO: Add logic to handle password update
+        pass
+
+    def on_cancel(self):
+        self.destroy()
 
 class DataPanel(SubPage):
     def __init__(self, master, switch_page_callback):
@@ -198,6 +246,11 @@ class DataPanel(SubPage):
             "show",
             lambda:self.toggle_show_entry_password()
             )
+        toggle_update_passw_btn = create_button(
+            "update",
+            lambda:self.toggle_update_entry_password()
+            )
+        
         self.password_entry = self.create_form_entry(
             self.details_frame,
             "Password",
@@ -205,7 +258,8 @@ class DataPanel(SubPage):
             type_password=True,
             buttons=[
                 copy_passw_btn,
-                toggle_show_passw_btn
+                toggle_show_passw_btn,
+                toggle_update_passw_btn
                 ],
             anchor=anchor,
             )
@@ -241,6 +295,14 @@ class DataPanel(SubPage):
         current_show_state = self.password_entry.cget("show")
         new_show_state = "" if current_show_state == "*" else "*"
         self.password_entry.config(show=new_show_state)
+
+
+    def toggle_update_entry_password(self):
+        update_window = UpdateWindow(self.master)
+        update_window.grab_set()  # Make the new window modal
+        update_window.wait_window()  # Wait for the new window to be closed
+
+ 
 
     def search(self):
         for child in self.button_frame.winfo_children():
@@ -287,8 +349,8 @@ class Navigation(SubPage):
             )
         add_button.pack(side=bconst.LEFT, padx=x_pad,pady=y_pad)
         self.nav_buttons.append(add_button)
-
-
+           
+    
         options_button = ttk.Button(
             self.master, 
             text="Options", 
@@ -324,6 +386,22 @@ class Navigation(SubPage):
 
 
 class AddDataPage(SubPage):
+    def __init__(self, master, switch_page_callback):
+        super().__init__(master, switch_page_callback)
+
+        self.label = ttk.Label(self, text="Create a new data entry")
+        self.label.pack(pady=10)
+
+        self.description= ttk.StringVar(value="")
+        self.username = ttk.StringVar(value="")
+        self.password = ttk.StringVar(value="")
+
+        self.create_form_entry(self,"Description", self.description)
+        self.create_form_entry(self,"Username", self.username)
+        self.create_form_entry(self,"Password", self.password,type_password=True)
+        self.create_buttonbox()
+
+class UpdateDataPage(SubPage):
     def __init__(self, master, switch_page_callback):
         super().__init__(master, switch_page_callback)
 
