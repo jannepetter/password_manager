@@ -1,5 +1,7 @@
 import ttkbootstrap as ttk
 import ttkbootstrap.constants as bconst
+from ttkbootstrap.tooltip import ToolTip
+from tkinter import filedialog
 from handle_data import (
     login, 
     read_data,
@@ -7,6 +9,9 @@ from handle_data import (
     db_init,
     change_login_password,
     check_if_first_login,
+    copy_db_to_location,
+    restore_db_from_location,
+    DB_NAME,
     )
 from ttkbootstrap.scrolled import ScrolledFrame
 from ttkbootstrap.dialogs import Messagebox
@@ -309,6 +314,16 @@ class Navigation(SubPage):
         password_change_btn.pack(side=bconst.LEFT, padx=x_pad,pady=y_pad)
         self.nav_buttons.append(password_change_btn)
 
+        backup_btn = ttk.Button(
+            self.master, 
+            text="Backups", 
+            state=self.status.get(),
+            command=lambda: self.switch_page_callback(BackupDataPage),
+            style=style_str,
+            )
+        backup_btn.pack(side=bconst.LEFT, padx=x_pad,pady=y_pad)
+        self.nav_buttons.append(backup_btn)
+
         logout_button = ttk.Button(
             self.master, 
             text="Logout", 
@@ -437,6 +452,89 @@ class ChangeMasterPasswordPage(SubPage):
     def on_cancel(self):
         self.switch_page_callback(DataPanel)
 
+
+class BackupDataPage(SubPage):
+    def __init__(self, master, switch_page_callback):
+        super().__init__(master, switch_page_callback)
+
+        page_frame = ttk.Frame(self,height=40,width=20)
+        page_frame.pack(side=bconst.RIGHT,pady=10,padx=10)
+        self.default_label_txt = "Create or restore a backup from your database."
+        self.label = ttk.Label(page_frame, text=self.default_label_txt)
+        self.label.pack(anchor="w")
+        self.error_label = ttk.Label(page_frame,text="",foreground="red")
+        self.error_label.pack(anchor="w")
+
+        btn =ttk.Button(
+            page_frame,
+            text="Copy your database to location",
+            command=self.backup_database,
+            )
+        tooltip_backup = f"""
+        Select a location and specify the name for the saved database, then click Save.
+        The database will be copied to your selected location. The same result can achieved by simply
+        copying your {DB_NAME} to your desired location
+        """.replace("\n","")
+        ToolTip(btn,text=tooltip_backup)
+        btn.pack(anchor="w",pady=25)
+
+        self.restore_label= ttk.Label(page_frame,text="Restore your database from location. Warning this will overwrite the current database!")
+        self.restore_label.pack(anchor="w")
+        self.restore_label2= ttk.Label(page_frame,text="Remember that login to old database requires the old database password and username")
+        self.restore_label2.pack(anchor="w")
+
+        restore_btn =ttk.Button(
+            page_frame,
+            text="Restore database from location",
+            command=self.restore_database,
+            bootstyle="danger"
+            )
+        tooltip_restore = f"""
+        Select a backup file to be restored as application database. The file will be copied from your
+        selected location to the project root. The same result can also be achieved by simply copying
+        your backup database and pasting it to the project root with name as {DB_NAME}
+        """.replace("\n","")
+        ToolTip(restore_btn,text=tooltip_restore)
+        restore_btn.pack(anchor="w",pady=15)
+        
+    def backup_database(self):
+        file_path = filedialog.asksaveasfilename(title="Copy database to location")
+
+        if isinstance(file_path,str) and file_path != "":
+            success, error = copy_db_to_location(file_path)
+            if success:
+                self.label.config(text="Database copied successfully!")
+                self.after(5000,lambda:self.label.config(text=self.default_label_txt))
+            elif error:
+                self.on_error(error)
+
+    def restore_database(self):
+        file_path = filedialog.askopenfile(title="Restore database from location",filetypes=(("All files", "*.db"),))
+        if file_path == None:
+            return
+
+        choise = self.confirm_choice("Current database will be overwritten! Are you sure you want to restore your old database?","Confirm database restore")
+        if choise != "Yes":
+            return
+
+        file_name = ""
+        if hasattr(file_path, "name"):
+            file_name = file_path.name
+
+        if isinstance(file_name,str) and file_name != "":
+            success, error = restore_db_from_location(file_name)
+            if success:
+                # TODO: replace with logout function when that is ready
+                self.master.key = None
+                self.switch_page_callback(LoginPage)
+            elif error:
+                self.on_error(error)
+        else:
+            self.on_error("Error occurred, database was not restored!")
+
+    def on_error(self,message):
+        self.error_label.config(text=message)
+        self.after(ERROR_MSG_TIME,lambda:self.error_label.config(text=""))
 
 class MainApplication(ttk.Window):
     def __init__(self, app_config):

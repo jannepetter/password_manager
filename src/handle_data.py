@@ -9,6 +9,8 @@ from cryptography.hazmat.primitives import padding
 import os
 import base64
 import json
+import shutil
+from pathlib import Path
 
 DB_NAME = "manager.db"
 ENCODING = "utf-8"
@@ -328,7 +330,30 @@ def copy_db_to_location(location_to_save):
     """
     For taking backups from the db. Saves it to user defined location.
     """
-    pass
+    try:
+        path = Path()
+        db_path = path.resolve() / DB_NAME
+        if ".db" not in location_to_save:
+            location_to_save= location_to_save+".db"
+        shutil.copy(db_path,location_to_save)
+    except Exception as e:
+        return False, e
+    
+    return True, None
+
+def restore_db_from_location(location_to_restore):
+    """
+    Restore database from location.
+    """
+    try:
+        path = Path()
+        db_path = path.resolve() / DB_NAME
+        shutil.copy(location_to_restore,db_path)
+    except Exception as e:
+        return False, e
+    
+    return True, None
+
 
 
 def db_init():
