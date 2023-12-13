@@ -12,12 +12,16 @@ from handle_data import (
     copy_db_to_location,
     restore_db_from_location,
     DB_NAME,
+    validate_password,
+    validate_username,
+    REQUIRED_PASSWORD_SCORE,
+    MIN_MASTER_PASSWORD_LENGTH,
     )
 from ttkbootstrap.scrolled import ScrolledFrame
 from ttkbootstrap.dialogs import Messagebox
 import pyperclip
 
-ERROR_MSG_TIME = 3000
+ERROR_MSG_TIME = 5000
 
 def create_button(text,call_back):
     btn = ttk.Button(
@@ -103,7 +107,15 @@ class LoginPage(SubPage):
 
         if self.first_login:
             self.create_form_entry(self,"Confirm password",self.password_confirm,True)
-            self.label.config(text="Select your username and password")
+            help_text = f"""
+            Select your username and password\n
+            Password min lenght {MIN_MASTER_PASSWORD_LENGTH}. Uppercase, lowercase, number and special char required.
+            """
+            if not self.master.use_validation:
+                # remove when finished product
+                help_text = "Select your username and password"
+
+            self.label.config(text=help_text)
 
         self.create_buttonbox()
 
@@ -111,22 +123,28 @@ class LoginPage(SubPage):
         """Show error and clear entries."""
         self.error_label.config(text=error_msg)
         self.after(ERROR_MSG_TIME, lambda:self.error_label.config(text=""))
-        self.username.set("")
-        self.password.set("")
-        self.password_confirm.set("")
 
     def on_submit(self):
         """Submit the login data."""
         error_msg = None
-
-        # TODO: validate username and password on first login
-        # required length and complexity for password at least
 
         if self.first_login and self.password.get() != self.password_confirm.get():
             error_msg = "Your password does not match with the confirm password"
 
         if error_msg:
             self.on_error(error_msg)
+            return
+        
+        password_score, password_errors = validate_password(self.password.get())
+        if self.master.use_validation and self.first_login and password_score < REQUIRED_PASSWORD_SCORE:
+            err_msg = "\n".join(err for err in password_errors)
+            self.on_error(err_msg)
+            return
+        
+        username_errors = validate_username(self.username.get())
+        if self.master.use_validation and self.first_login and username_errors:
+            err_msg = "\n".join(err for err in username_errors)
+            self.on_error(err_msg)
             return
 
         self.master.key = login(
@@ -377,19 +395,27 @@ class AddDataPage(SubPage):
 class ChangeMasterPasswordPage(SubPage):
     def __init__(self, master, switch_page_callback):
         super().__init__(master, switch_page_callback)
+        text = f"""
+        Change master password and/or username\n
+        Min length {MIN_MASTER_PASSWORD_LENGTH} chars. Upper, lower, number and special char required.
+        """
+        # switch for developing, remove when finished product
+        if not self.master.use_validation:
+            # remove when finished product
+            text= "Change master password and/or username"
 
-        self.label = ttk.Label(self, text="Change master password and/or username")
-        self.label.pack(pady=10)
+        self.label = ttk.Label(self, text=text)
+        self.label.pack()
 
         self.error_label = ttk.Label(self, text="",foreground="red")
-        self.error_label.pack(pady=10)
+        self.error_label.pack()
 
         form_frame = ttk.Frame(self)
         form_frame.pack(side=bconst.TOP)
         old_frame = ttk.Frame(form_frame)
-        old_frame.pack(side=bconst.LEFT,fill=bconst.BOTH,padx=50,pady=15)
+        old_frame.pack(side=bconst.LEFT,fill=bconst.BOTH,padx=50,pady=10)
         new_frame = ttk.Frame(form_frame)
-        new_frame.pack(side=bconst.LEFT,fill=bconst.BOTH,padx=15,pady=15)
+        new_frame.pack(side=bconst.LEFT,fill=bconst.BOTH,padx=15,pady=10)
 
 
         self.old_username = ttk.StringVar(value="")
@@ -409,27 +435,39 @@ class ChangeMasterPasswordPage(SubPage):
         self.create_buttonbox()
 
     def on_submit(self):
-        # TODO: password length and complexity checks for new passwords
+
+        new_username = self.new_username.get()
+        new_password = self.new_password.get()
+        confirm_new_password = self.confirm_new_password.get()
+
+        # Check before popping the confirm screen
+        if new_password != confirm_new_password:
+            self.on_error("New password does not match the Confirm New password field!")
+            return
+
+        # Check validations before popping the confirm screen
+        score, password_errors = validate_password(new_password)
+        if self.master.use_validation and score < REQUIRED_PASSWORD_SCORE:
+            password_err_msg = "\n".join(err for err in password_errors)
+            self.on_error(password_err_msg)
+            return
+
+        # Check validations before popping the confirm screen
+        username_errors = validate_username(new_username)
+        if self.master.use_validation and username_errors:
+            username_err_msg = "\n".join(err for err in username_errors)
+            self.on_error(username_err_msg)
+            return
 
         choice = self.confirm_choice("Confirm Master Password & Username change", "Change Master Password & Username")
  
         if choice != "Yes":
             return
 
-        new_username = self.new_username.get()
-        new_password = self.new_password.get()
-        confirm_new_password = self.confirm_new_password.get()
-
         old_username = self.old_username.get()
         old_password = self.old_password.get()
-
-
-        if new_password != confirm_new_password:
-            self.error_label.config(text="New password does not match the Confirm New password field!")
-            self.after(ERROR_MSG_TIME,lambda:self.error_label.config(text=""))
-            return
         
-        success, new_key, error = change_login_password(
+        success, new_key, login_error = change_login_password(
             old_username,
             old_password,
             new_username,
@@ -445,13 +483,15 @@ class ChangeMasterPasswordPage(SubPage):
             self.new_password.set("")
             self.confirm_new_password.set("")
          
-        if error:
-            self.error_label.config(text=error)
-            self.after(ERROR_MSG_TIME, lambda:self.error_label.config(text=""))
+        if login_error:
+            self.on_error(login_error)
 
     def on_cancel(self):
         self.switch_page_callback(DataPanel)
 
+    def on_error(self,message):
+        self.error_label.config(text=message)
+        self.after(ERROR_MSG_TIME, lambda:self.error_label.config(text=""))
 
 class BackupDataPage(SubPage):
     def __init__(self, master, switch_page_callback):
@@ -538,12 +578,13 @@ class BackupDataPage(SubPage):
 
 class MainApplication(ttk.Window):
     def __init__(self, app_config):
+        self.use_validation = True     # switch for development to bypass validation. Remove when product finished
         self.app_config = app_config
         theme = app_config.get("ui_theme", "darkly")
         super().__init__(themename=theme)
         db_init()
         self.title("Password manager")
-        self.geometry("800x400+100+100")
+        self.geometry("800x500+100+100")
 
         self.navigation_frame = ttk.Frame(self)
         self.navigation_frame.pack(side=bconst.TOP)

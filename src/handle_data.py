@@ -11,6 +11,7 @@ import base64
 import json
 import shutil
 from pathlib import Path
+from zxcvbn import zxcvbn
 
 DB_NAME = "manager.db"
 ENCODING = "utf-8"
@@ -21,6 +22,9 @@ DEFAULT_CONFIG = {
     "logout":15,
     "ui_theme":"darkly"
 }
+MIN_MASTER_PASSWORD_LENGTH = 12
+MIN_USERNAME_LENGTH = 4
+REQUIRED_PASSWORD_SCORE = 4
 
 
 def generate_key(password:str, username:str):
@@ -434,6 +438,60 @@ def check_if_first_login():
     
     conn.close()
     return len(rows) == 0
+
+def validate_username(username):
+    """
+    Username validations. The username is used in key creation.
+    """
+    errors = []
+    if len(username)< MIN_USERNAME_LENGTH:
+        errors.append(f"Minimum length for username is {MIN_USERNAME_LENGTH}")
+
+    return errors
+
+
+def validate_password(password):
+    """
+    Basic password validation
+    """
+    errors = []
+
+    # Base requirements
+    if len(password)< MIN_MASTER_PASSWORD_LENGTH:
+        errors.append(f"Required password length >= {MIN_MASTER_PASSWORD_LENGTH} chars.")
+
+    if not any(char.isupper() for char in password):
+        errors.append("Uppercase char required in password.")
+    
+    if not any(char.islower() for char in password):
+        errors.append("Lowercase char required in password.")
+
+    if not any(char in punctuation for char in password):
+        errors.append(f"Special char required in password: {punctuation}")
+
+    if not any(char in digits for char in password):
+        errors.append(f"Number required in password: {digits}")
+
+    # Base requirements are not met
+    if errors:
+        return 0, errors
+    
+    # can detect too low complexity passwords
+    results = zxcvbn(password)
+    score = results["score"]
+
+    errors = errors + results["feedback"]["suggestions"]
+    if results["feedback"]["warning"] != "":
+        errors.append(results["feedback"]["warning"])
+
+    if score < REQUIRED_PASSWORD_SCORE:
+        errors.append(f"Complexity score {score} is below the required {REQUIRED_PASSWORD_SCORE}. Your password is too predictable.")
+
+    return score,errors
+
+    
+
+
             
 
 
