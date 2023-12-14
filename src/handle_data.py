@@ -98,7 +98,8 @@ def _decrypt_raw_data(key, rows):
     
     return data
 
-def read_data(key):
+
+def read_data(key,limit=100, page=0, search_word=None):
     """
     Reads data from db and returns a list of dicts containing user data in decrypted form.
     [
@@ -110,6 +111,9 @@ def read_data(key):
         }
     ]
     """
+    if search_word == "":
+        search_word = None
+
     ok = check_master_password_ok(key)
 
     if not ok:
@@ -119,17 +123,39 @@ def read_data(key):
     conn = connect(DB_NAME)
     cursor = conn.cursor()
 
-    cursor.execute('''
-        SELECT id, description, password, username, vector
-        FROM passwords
-    ''')
+    offset = limit*page
+    if search_word:
+        print('')
+        cursor.execute('''
+            SELECT id, description, password, username, vector
+            FROM passwords
+            '''
+        )
+    else:
+        cursor.execute('''
+            SELECT id, description, password, username, vector
+            FROM passwords LIMIT ? OFFSET ?
+            ''',
+            (
+                limit,
+                offset
+            )
+        )
 
     rows = cursor.fetchall()
     data = _decrypt_raw_data(key,rows)
         
+    if search_word:
+        total_count = len(data)
+        all_data = [d for d in data if search_word in d["description"]]
+        data = all_data[offset:offset+limit]
+    else:
+        total_count_query = "SELECT COUNT(*) FROM passwords"
+        cursor.execute(total_count_query)
+        total_count = cursor.fetchone()[0]
     conn.close()
 
-    return data
+    return data, total_count
 
 def check_master_password_ok(key):
     """
@@ -255,7 +281,7 @@ def change_login_password(username, password, new_username, new_password):
         error = "Old username and password did not match!"
         return False,None, error
     
-    original_data = read_data(key)
+    original_data, _ = read_data(key)
     try:
         new_key = generate_key(new_password,new_username)
 

@@ -38,7 +38,8 @@ class TestDB(unittest.TestCase):
         os.remove(self.db_name)
 
     def test_read_data(self):
-        data = read_data(self.key)
+        data, count = read_data(self.key)
+        self.assertEqual(1,count)
         self.assertListEqual(
             [
                 {
@@ -53,8 +54,8 @@ class TestDB(unittest.TestCase):
 
     def test_write_data(self):
         write_data(self.key,"testing","some_password","username")
-        data = read_data(self.key)
-
+        data,count = read_data(self.key)
+        self.assertEqual(2,count)
         self.assertListEqual(
             [
                 {
@@ -74,19 +75,21 @@ class TestDB(unittest.TestCase):
         )
     
     def test_remove_data(self):
-        data = read_data(self.key)
+        data,count = read_data(self.key)
         self.assertEqual(1,len(data))
+        self.assertEqual(1,count)
 
         delete_data(self.key,1)
 
-        data = read_data(self.key)
+        data,_ = read_data(self.key)
         self.assertListEqual(
             [],
             data
         )
 
     def test_edit_data(self):
-        data = read_data(self.key)
+        data, count = read_data(self.key)
+        self.assertEqual(1,count)
 
         self.assertListEqual(
             [
@@ -105,7 +108,8 @@ class TestDB(unittest.TestCase):
             'base_password', 
             'base_username'
             )
-        data = read_data(self.key)
+        data,count = read_data(self.key)
+        self.assertEqual(1,count)
         self.assertListEqual(
            [
             {
@@ -189,14 +193,15 @@ class TestDB(unittest.TestCase):
         new_password = "new_secret"
         new_username = "new_username"
 
-        data = read_data(self.key)
+        data, count = read_data(self.key)
         self.assertEqual(1,len(data))
+        self.assertEqual(1,count)
 
         ok = change_login_password(self.username,self.password,new_username,new_password)
         self.assertTrue(ok)
 
         new_key = generate_key(new_password,new_username)
-        data = read_data(new_key)
+        data,_ = read_data(new_key)
         self.assertListEqual(
             [
                 {
