@@ -1,8 +1,7 @@
 # password manager
 
 ## Ui
-A quick cookup with tkinter and tkinterbootstrap for UI demo. 
-Login is bypassed and only static data is currently shown.
+UI build with tkinter and ttkinterbootstrap
 
 ## Database
 Done using sqlite. Uses AES 256 encryption and the data is always stored in there as encrypted.
@@ -24,5 +23,4 @@ and investigate the ciphered values.
 
 For further instructions how to use, please check the /tests folder
 ```
-# You can also run the tests
 python3 -m unittest discover -s tests

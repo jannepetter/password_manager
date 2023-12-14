@@ -168,6 +168,63 @@ class LoginPage(SubPage):
         self.switch_page_callback(DataPanel)
 
  
+class PaginationFrame(ttk.Frame):
+    def __init__(self, master):
+        super().__init__(master)
+        self.master= master
+        self.current_page = ttk.IntVar(self,0)
+        x_pad = 2
+        y_pad = 2
+        label_frame = ttk.Frame(self)
+        pag_label = ttk.Label(label_frame, text="Page")
+        pag_label.pack(side=bconst.LEFT)
+        self.info_label = ttk.Label(label_frame, text="")
+        self.info_label.pack(side=bconst.LEFT,padx=10)
+        label_frame.pack(anchor="w")
+        prev = ttk.Button(
+            self,
+            text="prev",
+            command=lambda:self.paginate(self.current_page.get(), -1)
+            )
+        prev.pack(side=bconst.LEFT,padx=x_pad,pady=y_pad)
+        next = ttk.Button(
+            self,
+            text="next",
+            command=lambda:self.paginate(self.current_page.get(),+1)
+            )
+        next.pack(side=bconst.LEFT,padx=x_pad,pady=y_pad)
+        self.page_entry = ttk.Entry(self,width=3, textvariable=str(self.current_page))
+        self.page_entry.pack(side=bconst.LEFT,padx=x_pad)
+        go = ttk.Button(
+            self,
+            text="go",
+            command=lambda:self.paginate(self.current_page.get(),0)
+            )
+        go.pack(side=bconst.LEFT,padx=x_pad,pady=y_pad)
+
+    def paginate(self,page, addition):
+        new_page = page + addition
+        if new_page <0:
+            self.current_page.set(0)
+            return
+        self.current_page.set(new_page)
+        self.page_entry.config(textvariable=str(self.current_page))
+
+        self.master.data_list,count = read_data(
+            self.master.master.key,
+            limit=self.master.master.pagination_limit,
+            page=new_page,
+            search_word=self.master.search_var.get()
+            )
+        self.total_count = count
+        for child in self.master.button_frame.winfo_children():
+            child.destroy()
+        self.master.create_description_list()
+        self.update_info()
+
+    def update_info(self):
+        txt = f"{self.current_page.get()} / {self.total_count//self.master.master.pagination_limit}  (Total: {self.total_count})"
+        self.info_label.config(text=txt)
 
 class DataPanel(SubPage):
     def __init__(self, master, switch_page_callback):
@@ -180,7 +237,7 @@ class DataPanel(SubPage):
 
         self.common_frame = ttk.Frame(self)
         self.common_frame.pack(side=bconst.TOP,fill=bconst.X)
-        self.button_frame = ScrolledFrame(self.common_frame, autohide=True)
+        self.button_frame = ScrolledFrame(self.common_frame, autohide=True,height=400)
         self.button_frame.pack(side=bconst.LEFT,padx=5, fill=bconst.BOTH)
 
         self.details_frame = ttk.Frame(self.common_frame)
@@ -232,9 +289,15 @@ class DataPanel(SubPage):
                 ],
             anchor=anchor,
             )
-
-        self.data_list = read_data(self.master.key)
+        self.paginator = PaginationFrame(self)
+        self.paginator.pack(anchor="w")
+        self.data_list, count = read_data(
+            self.master.key,
+            limit=self.master.pagination_limit,
+            )
+        self.paginator.total_count = count
         self.create_description_list()
+        self.paginator.update_info()
 
     def create_description_list(self):
         for i, data in enumerate(self.data_list):
@@ -269,13 +332,24 @@ class DataPanel(SubPage):
         for child in self.button_frame.winfo_children():
             child.destroy()
         
+        self.paginator.current_page.set(0)
         if self.search_var.get() == "":
-            self.data_list = read_data(self.master.key)
+            self.data_list, count = read_data(
+                self.master.key,
+                limit=self.master.pagination_limit,
+                page=self.paginator.current_page.get(),
+                )
         else:
-            self.data_list = [
-                x for x in self.data_list if self.search_var.get() in x["description"]
-                ]
+            self.data_list, count = read_data(
+                self.master.key,
+                limit=self.master.pagination_limit,
+                search_word=self.search_var.get(),
+                page=self.paginator.current_page.get(),
+                )
+            
+        self.paginator.total_count = count
         self.create_description_list()
+        self.paginator.update_info()
 
 
 class Navigation(SubPage):
@@ -580,11 +654,12 @@ class MainApplication(ttk.Window):
     def __init__(self, app_config):
         self.use_validation = True     # switch for development to bypass validation. Remove when product finished
         self.app_config = app_config
+        self.pagination_limit = 200
         theme = app_config.get("ui_theme", "darkly")
         super().__init__(themename=theme)
         db_init()
         self.title("Password manager")
-        self.geometry("800x500+100+100")
+        self.geometry("800x600+100+100")
 
         self.navigation_frame = ttk.Frame(self)
         self.navigation_frame.pack(side=bconst.TOP)
