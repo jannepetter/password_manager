@@ -1,4 +1,6 @@
 {
-    "logout": 15,
+    "logout": 10,
+    "pagination": 200,
+    "random_password_length": 30,
     "ui_theme": "darkly"
 }
