@@ -1,4 +1,5 @@
 import tkinter as tk
+import uuid
 from tkinter import ttk
 import ttkbootstrap as ttk
 import ttkbootstrap.constants as bconst
@@ -151,12 +152,10 @@ class LoginPage(SubPage):
 
 
 class UpdateWindow(tk.Toplevel):
-    def __init__(self, master, entry_id):
-        self.entry_id = entry_id
+    def __init__(self, master):
         super().__init__(master)
         self.title("Update Password")
         self.geometry("400x400")
-        print(self.entry_id)
 
         # Frame to hold labels, entry widgets, and buttons
         frame = ttk.Frame(self)
@@ -197,18 +196,8 @@ class UpdateWindow(tk.Toplevel):
         entry.config(show=new_show_state)
 
     def on_submit(self):
-        data = []
-        for entry in self.entries:
-            data.append(entry.get())
-
-        edit_data(
-            self.master.key,
-            self.entry_id,
-            data[0],
-            data[1],
-            data[2]
-        )
-        self.destroy()
+        # TODO: Add logic to handle password update
+        pass
 
 
 # Custom Entry widget with placeholder
@@ -261,12 +250,15 @@ class DataPanel(SubPage):
 
         self.common_frame = ttk.Frame(self)
         self.common_frame.pack(side=bconst.TOP, fill=bconst.X)
+
         self.button_frame = ScrolledFrame(self.common_frame, autohide=True)
         self.button_frame.pack(side=bconst.LEFT, padx=5, fill=bconst.BOTH)
 
         self.details_frame = ttk.Frame(self.common_frame)
         self.details_frame.pack(side=bconst.LEFT, padx=30)
         anchor = "w"
+        self.message = tk.Label(self.details_frame, text="", foreground="white")
+        self.message.pack(pady=5)
 
         self.entry_description_var = ttk.StringVar(value="")
         copy_desc_btn = create_button(
@@ -309,7 +301,11 @@ class DataPanel(SubPage):
 
         toggle_delete_passw_btn = create_button(
             "Delete",
-            lambda: self.toggle_delete_entry_password(self.current_index)
+            lambda: self.toggle_delete_entry_password()
+        )
+        toggle_generate_passw_btn = create_button(
+            "Generate",
+            lambda: self.toggle_generate_entry_password()
         )
 
         self.password_entry = self.create_form_entry(
@@ -319,7 +315,8 @@ class DataPanel(SubPage):
             type_password=True,
             buttons=[
                 copy_passw_btn,
-                toggle_show_passw_btn
+                toggle_show_passw_btn,
+                toggle_generate_passw_btn
             ],
             anchor=anchor,
         )
@@ -338,27 +335,17 @@ class DataPanel(SubPage):
         self.data_list = read_data(self.master.key)
         self.create_description_list()
 
-    def toggle_update_entry_password(self):
-        entry_id = self.data_list[self.current_index].get('id')
-        update_window = UpdateWindow(self.master, entry_id)
-        update_window.grab_set()
-        update_window.wait_window()
-        self.data_list = []
-        for child in self.button_frame.winfo_children():
-            child.destroy()
-        self.data_list = read_data(self.master.key)
-        self.create_description_list()
-        self.current_index = -1
+    def toggle_generate_entry_password(self):
+        self.entry_password_var.set(str(uuid.uuid4())[:10])
 
-    def toggle_delete_entry_password(self, index):
-        choice = self.confirm_choice(
-            message="Confirm Deleting your Entry",
-            title="Confirm Deletion"
-        )
-
-        if choice == "Yes":
-            if index != -1:
-                entry_id = self.data_list[index].get('id')
+    def toggle_delete_entry_password(self):
+        if self.current_index != -1:
+            choice = self.confirm_choice(
+                message="Confirm Deleting your Entry",
+                title="Confirm Deletion"
+            )
+            if choice == "Yes":
+                entry_id = self.data_list[self.current_index].get('id')
                 delete_data(self.master.key, entry_id)
                 self.data_list = []
                 for child in self.button_frame.winfo_children():
@@ -366,13 +353,11 @@ class DataPanel(SubPage):
                 self.data_list = read_data(self.master.key)
                 self.create_description_list()
                 self.current_index = -1
-
-            # if(delete_data()){
-            # print("Entry deleted!")
-            # }
-
+                self.entry_description_var.set("")
+                self.entry_password_var.set("")
+                self.entry_username_var.set("")
         else:
-            print("Deletion canceled.")
+            self.message.config(text="Error! No data selected")
 
     def confirm_choice(self, message, title):
         return Messagebox.yesno(message=message, title=title, parent=self)
@@ -390,6 +375,7 @@ class DataPanel(SubPage):
 
     def show_details(self, index):
         self.current_index = index
+        self.message.config(text="")
         detail = self.data_list[index]
         description = detail["description"]
         username = detail["username"]
@@ -407,16 +393,25 @@ class DataPanel(SubPage):
         self.password_entry.config(show=new_show_state)
 
     def toggle_update_entry_password(self):
-        entry_id = self.data_list[self.current_index].get('id')
-        update_window = UpdateWindow(self.master, entry_id)
-        update_window.grab_set()
-        update_window.wait_window()
-        self.data_list = []
-        for child in self.button_frame.winfo_children():
-            child.destroy()
-        self.data_list = read_data(self.master.key)
-        self.create_description_list()
-        self.current_index = -1
+        if self.current_index != -1:
+            entry_id = self.data_list[self.current_index].get('id')
+            edit_data(
+                self.master.key, entry_id,
+                self.entry_description_var.get(),
+                self.entry_password_var.get(),
+                self.entry_username_var.get()
+            )
+            self.data_list = []
+            for child in self.button_frame.winfo_children():
+                child.destroy()
+            self.data_list = read_data(self.master.key)
+            self.create_description_list()
+            self.current_index = -1
+            self.entry_description_var.set("")
+            self.entry_password_var.set("")
+            self.entry_username_var.set("")
+        else:
+            self.message.config(text="Error! No data selected")
 
     def search(self):
         for child in self.button_frame.winfo_children():
@@ -501,7 +496,6 @@ class Navigation(SubPage):
         self.master.key = None
         self.switch_page_callback(LoginPage)
 
-
 class AddDataPage(SubPage):
     def __init__(self, master, switch_page_callback):
         super().__init__(master, switch_page_callback)
@@ -512,10 +506,23 @@ class AddDataPage(SubPage):
         self.description = ttk.StringVar(value="")
         self.username = ttk.StringVar(value="")
         self.password = ttk.StringVar(value="")
+        self.show_btn = create_button(
+            "Show",
+            lambda: self.show_password()
+        )
+        self.generate_btn = create_button(
+            "Generate",
+            lambda: self.generate_entry_password()
+        )
 
         self.create_form_entry(self, "Description", self.description)
         self.create_form_entry(self, "Username", self.username)
-        self.create_form_entry(self, "Password", self.password, type_password=True)
+        # self.create_form_entry(self, "Password", self.password, type_password=True)
+        self.pass_entry = self.create_form_entry(self, "Password", self.password,
+                                                 type_password=True,
+                                                 buttons=[
+                                                     self.show_btn, self.generate_btn
+                                                 ])
         self.create_buttonbox()
 
     def on_submit(self):
@@ -536,6 +543,14 @@ class AddDataPage(SubPage):
 
     def on_cancel(self):
         self.switch_page_callback(DataPanel)
+
+    def generate_entry_password(self):
+        self.password.set(str(uuid.uuid4())[:10])
+
+    def show_password(self):
+        current_show_state = self.pass_entry.cget("show")
+        new_show_state = "" if current_show_state == "*" else "*"
+        self.pass_entry.config(show=new_show_state)
 
 
 class ChangeMasterPasswordPage(SubPage):

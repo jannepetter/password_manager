@@ -16,12 +16,12 @@ VECTOR_LENGTH = 16
 KEY_ITERATIONS = 5000000
 CONFIG_PATH = "config.json"
 DEFAULT_CONFIG = {
-    "logout":15,
-    "ui_theme":"darkly"
+    "logout": 15,
+    "ui_theme": "darkly"
 }
 
 
-def generate_key(password:str, username:str):
+def generate_key(password: str, username: str):
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         iterations=KEY_ITERATIONS,
@@ -33,7 +33,8 @@ def generate_key(password:str, username:str):
 
     return key
 
-def _encrypt(plaintext:str, key, init_vector):
+
+def _encrypt(plaintext: str, key, init_vector):
     """
     Encrypt with aes256.
 
@@ -47,6 +48,7 @@ def _encrypt(plaintext:str, key, init_vector):
     ciphertext = base64.b64encode(cipher_bytes).decode(ENCODING)
 
     return ciphertext
+
 
 def _decrypt(ciphertext, key, init_vector):
     """
@@ -63,34 +65,37 @@ def _decrypt(ciphertext, key, init_vector):
     decrypted_text = decrypted_bytes.decode(ENCODING)
     return decrypted_text
 
+
 def generate_random_password(length):
     """
     Generates random password.
     """
     characters = ascii_letters + digits + punctuation
     password = ''.join(secrets.choice(characters) for _ in range(length))
-    
+
     return password
+
 
 def _decrypt_raw_data(key, rows):
     data = []
     for row in rows:
         id = row[0]
         init_vector = row[4]
-        description = _decrypt(row[1],key,init_vector)
-        password = _decrypt(row[2],key,init_vector)
-        username = _decrypt(row[3],key,init_vector)
+        description = _decrypt(row[1], key, init_vector)
+        password = _decrypt(row[2], key, init_vector)
+        username = _decrypt(row[3], key, init_vector)
 
         data.append(
             {
-                "id":id,
-                "description":description,
-                "password":password,
-                "username":username
+                "id": id,
+                "description": description,
+                "password": password,
+                "username": username
             }
         )
-    
+
     return data
+
 
 def read_data(key):
     """
@@ -109,7 +114,7 @@ def read_data(key):
     if not ok:
         # return empty list if the key (username & password) are wrong
         return []
-    
+
     conn = connect(DB_NAME)
     cursor = conn.cursor()
 
@@ -119,11 +124,12 @@ def read_data(key):
     ''')
 
     rows = cursor.fetchall()
-    data = _decrypt_raw_data(key,rows)
-        
+    data = _decrypt_raw_data(key, rows)
+
     conn.close()
 
     return data
+
 
 def check_master_password_ok(key):
     """
@@ -143,16 +149,16 @@ def check_master_password_ok(key):
     try:
         for row in rows:
             init_vector = row[1]
-            _decrypt(row[0],key,init_vector)
+            _decrypt(row[0], key, init_vector)
     except Exception:
         conn.close()
         return False
-    
+
     conn.close()
     return True
 
 
-def write_data(key,description,password,username="")-> bool:
+def write_data(key, description, password, username="") -> bool:
     """
     Writes a new entry to db. Returns True if successful
     """
@@ -161,11 +167,11 @@ def write_data(key,description,password,username="")-> bool:
     if not ok:
         # return if the key (username & password) are wrong
         return False
-    
+
     init_vector = os.urandom(VECTOR_LENGTH)
-    encrypted_description = _encrypt(description,key,init_vector)
-    encrypted_password = _encrypt(password,key,init_vector)
-    encrypted_username = _encrypt(username,key,init_vector)
+    encrypted_description = _encrypt(description, key, init_vector)
+    encrypted_password = _encrypt(password, key, init_vector)
+    encrypted_username = _encrypt(username, key, init_vector)
 
     conn = connect(DB_NAME)
     cursor = conn.cursor()
@@ -174,18 +180,18 @@ def write_data(key,description,password,username="")-> bool:
     cursor.execute('''
         INSERT INTO passwords (description, password, username, vector)
         VALUES (?, ?, ?, ?)
-    ''', (encrypted_description, 
-        encrypted_password, 
-        encrypted_username,
-        init_vector
-        ))
+    ''', (encrypted_description,
+          encrypted_password,
+          encrypted_username,
+          init_vector
+          ))
     conn.commit()
     conn.close()
 
     return True
 
 
-def delete_data(key,id)-> bool:
+def delete_data(key, id) -> bool:
     """
     Deletes the entry by id.
     """
@@ -193,7 +199,7 @@ def delete_data(key,id)-> bool:
     if not ok:
         # return if the key (username & password) are wrong
         return False
-    
+
     conn = connect(DB_NAME)
     cursor = conn.cursor()
 
@@ -202,7 +208,8 @@ def delete_data(key,id)-> bool:
 
     conn.close()
 
-def edit_data(key,id,description,password,username):
+
+def edit_data(key, id, description, password, username):
     """
     Edits the stored entry
     """
@@ -212,10 +219,9 @@ def edit_data(key,id,description,password,username):
         return False
 
     init_vector = os.urandom(VECTOR_LENGTH)
-    encrypted_description = _encrypt(description,key,init_vector)
-    encrypted_password = _encrypt(password,key,init_vector)
-    encrypted_username = _encrypt(username,key,init_vector)
-
+    encrypted_description = _encrypt(description, key, init_vector)
+    encrypted_password = _encrypt(password, key, init_vector)
+    encrypted_username = _encrypt(username, key, init_vector)
 
     conn = connect(DB_NAME)
     cursor = conn.cursor()
@@ -224,14 +230,15 @@ def edit_data(key,id,description,password,username):
     cursor.execute('''
         UPDATE passwords SET description = ?, password = ?, username = ?, vector = ?
         WHERE id = ?
-    ''', (encrypted_description, 
-          encrypted_password, 
+    ''', (encrypted_description,
+          encrypted_password,
           encrypted_username,
           init_vector,
           id
           ))
     conn.commit()
     conn.close()
+
 
 def change_login_password(username, password, new_username, new_password):
     """
@@ -242,52 +249,51 @@ def change_login_password(username, password, new_username, new_password):
     does not, the change of the master password is aborted and rollback occurs.
     """
     error = ""
-    key = generate_key(password,username)
+    key = generate_key(password, username)
 
     ok = check_master_password_ok(key)
     if not ok:
         error = "Old username and password did not match!"
-        return False,None, error
-    
+        return False, None, error
+
     original_data = read_data(key)
     try:
-        new_key = generate_key(new_password,new_username)
+        new_key = generate_key(new_password, new_username)
 
         conn = connect(DB_NAME)
         conn.execute('BEGIN TRANSACTION')
         cursor = conn.cursor()
 
         for el in original_data:
-
             init_vector = os.urandom(VECTOR_LENGTH)
             id = el["id"]
             description = el["description"]
             password = el["password"]
             username = el["username"]
 
-            encrypted_description = _encrypt(description,new_key,init_vector)
-            encrypted_password = _encrypt(password,new_key,init_vector)
-            encrypted_username = _encrypt(username,new_key,init_vector)
+            encrypted_description = _encrypt(description, new_key, init_vector)
+            encrypted_password = _encrypt(password, new_key, init_vector)
+            encrypted_username = _encrypt(username, new_key, init_vector)
 
             cursor.execute('''
                 UPDATE passwords SET description = ?, password = ?, username = ?, vector = ?
                 WHERE id = ?
-            ''', (encrypted_description, 
-                encrypted_password, 
-                encrypted_username,
-                init_vector,
-                id
-                ))
-        
+            ''', (encrypted_description,
+                  encrypted_password,
+                  encrypted_username,
+                  init_vector,
+                  id
+                  ))
+
         # Data should be identical to original data when decrypted. Raise error if not.
-        
+
         cursor.execute('''
             SELECT id, description, password, username, vector
             FROM passwords
         ''')
 
         rows = cursor.fetchall()
-        data = _decrypt_raw_data(new_key,rows)
+        data = _decrypt_raw_data(new_key, rows)
 
         # check that each entry matches the old when decrypted with the new key
         for i in range(len(original_data)):
@@ -297,19 +303,18 @@ def change_login_password(username, password, new_username, new_password):
             assert original_data[i]["username"] == data[i]["username"], "username is not the same"
 
         conn.commit()
-        
+
     except Exception as e:
         error = "Password change failed!"
         conn.rollback()
         conn.close()
         return False, None, error
-        
+
     conn.close()
-    return True,new_key, error
+    return True, new_key, error
 
-    
 
-def login(password,username):
+def login(password, username):
     """
     Returns a key for db actions. 
     
@@ -320,7 +325,7 @@ def login(password,username):
 
     if ok:
         return key
-    
+
     return None
 
 
@@ -350,6 +355,7 @@ def db_init():
     conn.commit()
     conn.close()
 
+
 def read_config():
     """
     Read application configs.
@@ -358,17 +364,18 @@ def read_config():
 
     try:
         with open(CONFIG_PATH, "r") as json_file:
-                
-                data = json.load(json_file)
 
-                if not isinstance(data,dict):
-                    raise ValueError("Config data was not a dict")
-                
+            data = json.load(json_file)
+
+            if not isinstance(data, dict):
+                raise ValueError("Config data was not a dict")
+
     except Exception:
-            # config.json is not found, damaged, etc.
-            data = DEFAULT_CONFIG
+        # config.json is not found, damaged, etc.
+        data = DEFAULT_CONFIG
 
     return data
+
 
 def save_config(data):
     """
@@ -376,15 +383,15 @@ def save_config(data):
     """
     error = None
     try:
-        if not isinstance(data,dict):
+        if not isinstance(data, dict):
             raise ValueError("Config data must be a dict. Restoring default config")
-        
+
         if "ui_theme" not in data:
             raise ValueError("Config data must contain ui_theme. Restoring default config")
-        
+
         if "logout" not in data:
             raise ValueError("Config data must contain logout time. Restoring default config")
-        
+
         with open(CONFIG_PATH, "w") as json_file:
             json.dump(data, json_file, indent=4)
             return error
@@ -394,8 +401,9 @@ def save_config(data):
         # something went wrong, save default config to recover.
         with open(CONFIG_PATH, "w") as json_file:
             json.dump(DEFAULT_CONFIG, json_file, indent=4)
-    
+
     return error
+
 
 def check_if_first_login():
     conn = connect(DB_NAME)
@@ -406,11 +414,6 @@ def check_if_first_login():
         FROM passwords
     ''')
     rows = cursor.fetchall()
-    
+
     conn.close()
     return len(rows) == 0
-            
-
-
-
-
