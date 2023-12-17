@@ -1,3 +1,5 @@
+import uuid
+
 import ttkbootstrap as ttk
 import ttkbootstrap.constants as bconst
 from ttkbootstrap.tooltip import ToolTip
@@ -18,6 +20,8 @@ from handle_data import (
     MIN_MASTER_PASSWORD_LENGTH,
     read_config,
     save_config,
+    delete_data,
+    edit_data
 )
 from ttkbootstrap.scrolled import ScrolledFrame
 from ttkbootstrap.dialogs import Messagebox
@@ -252,17 +256,19 @@ class PaginationFrame(ttk.Frame):
         self.update_info()
 
     def update_info(self):
-        txt = f"{self.current_page.get()} / {self.total_count//self.master.master.pagination_limit}  (Total: {self.total_count})"
+        txt = f"{self.current_page.get()} / {self.total_count // self.master.master.pagination_limit}  (Total: {self.total_count})"
         self.info_label.config(text=txt)
 
 
 class DataPanel(SubPage):
     def __init__(self, master, switch_page_callback):
         super().__init__(master, switch_page_callback)
+        self.current_index = -1
         self.search_frame = ttk.Frame(self)
         self.search_frame.pack(side=bconst.TOP, fill=bconst.X)
         self.search_var = ttk.StringVar(value="")
-        btn = create_button("search", self.search, photo="img/search.png")
+        # btn = create_button("search", self.search, photo="img/search.png")
+        btn = create_button("search", self.search)
         ToolTip(btn, "Search")
 
         self.create_form_entry(self.search_frame, "Search",
@@ -278,12 +284,15 @@ class DataPanel(SubPage):
         self.details_frame.pack(side=bconst.LEFT, padx=30)
         anchor = "w"
 
+        self.message = ttk.Label(self.details_frame, text="", foreground="white")
+        self.message.pack(pady=5)
+
         copy_tooltip = "Copy to clipboard"
         self.entry_description_var = ttk.StringVar(value="")
         copy_desc_btn = create_button(
             "copy",
             lambda: self.copy_to_clipboard(self.entry_description_var.get()),
-            photo="img/copy.png"
+            # photo="img/copy.png"
         )
         ToolTip(copy_desc_btn, copy_tooltip)
         self.create_form_entry(
@@ -298,7 +307,7 @@ class DataPanel(SubPage):
         copy_uname_btn = create_button(
             "copy",
             lambda: self.copy_to_clipboard(self.entry_username_var.get()),
-            photo="img/copy.png"
+            # photo="img/copy.png"
         )
         ToolTip(copy_uname_btn, copy_tooltip)
 
@@ -313,16 +322,28 @@ class DataPanel(SubPage):
         copy_passw_btn = create_button(
             "copy",
             lambda: self.copy_to_clipboard(self.entry_password_var.get()),
-            photo="img/copy.png"
+            # photo="img/copy.png"
         )
         ToolTip(copy_passw_btn, copy_tooltip)
 
         toggle_show_passw_btn = create_button(
             "show",
             lambda: self.toggle_show_entry_password(),
-            photo="img/eye.png"
+            # photo="img/eye.png"
         )
         ToolTip(toggle_show_passw_btn, "Show password")
+        generate_password_btn = create_button(
+            "Generate",
+            lambda: self.generate_entry_password()
+        )
+        update_password_btn = create_button(
+            "Update",
+            lambda: self.update_entry()
+        )
+        delete_password_btn = create_button(
+            "Delete",
+            lambda: self.delete_entry()
+        )
 
         self.password_entry = self.create_form_entry(
             self.details_frame,
@@ -331,10 +352,22 @@ class DataPanel(SubPage):
             type_password=True,
             buttons=[
                 copy_passw_btn,
-                toggle_show_passw_btn
+                toggle_show_passw_btn,
+                generate_password_btn
             ],
             anchor=anchor,
         )
+        delete_button_frame = ttk.Frame(self.details_frame)
+        delete_button_frame.pack(side=bconst.LEFT, padx=5)
+
+        delete_password_btn.pack(in_=delete_button_frame, side=bconst.LEFT, padx=5)
+
+        # Add the 'Update' button to the next column
+        update_button_frame = ttk.Frame(self.details_frame)
+        update_button_frame.pack(side=bconst.LEFT, padx=5)
+
+        update_password_btn.pack(in_=update_button_frame, side=bconst.LEFT, padx=5)
+
         self.paginator = PaginationFrame(self)
         self.paginator.pack(anchor="w")
         self.data_list, count = read_data(
@@ -358,12 +391,72 @@ class DataPanel(SubPage):
 
     def show_details(self, index):
         detail = self.data_list[index]
+        self.current_index = index
+        self.message.config(text="")
         description = detail["description"]
         username = detail["username"]
         password = detail["password"]
         self.entry_description_var.set(description)
         self.entry_username_var.set(username)
         self.entry_password_var.set(password)
+
+    def confirm_choice(self, message, title):
+        return Messagebox.yesno(message=message, title=title, parent=self)
+
+    def delete_entry(self):
+        if self.current_index != -1:
+            choice = self.confirm_choice(
+                message="Confirm Deleting your Entry",
+                title="Confirm Deletion"
+            )
+            if choice == "Yes":
+                entry_id = self.data_list[self.current_index].get('id')
+                delete_data(self.master.key, entry_id)
+                self.data_list = []
+                for child in self.button_frame.winfo_children():
+                    child.destroy()
+                self.data_list, count = read_data(
+                    self.master.key,
+                    limit=self.master.pagination_limit,
+                )
+                self.paginator.total_count = count
+                self.create_description_list()
+                self.paginator.update_info()
+                self.current_index = -1
+                self.entry_description_var.set("")
+                self.entry_password_var.set("")
+                self.entry_username_var.set("")
+        else:
+            self.message.config(text="Error! No data selected")
+
+    def update_entry(self):
+        if self.current_index != -1:
+            entry_id = self.data_list[self.current_index].get('id')
+            edit_data(
+                self.master.key, entry_id,
+                self.entry_description_var.get(),
+                self.entry_password_var.get(),
+                self.entry_username_var.get()
+            )
+            self.data_list = []
+            for child in self.button_frame.winfo_children():
+                child.destroy()
+            self.data_list, count = read_data(
+                self.master.key,
+                limit=self.master.pagination_limit,
+            )
+            self.paginator.total_count = count
+            self.create_description_list()
+            self.paginator.update_info()
+            self.current_index = -1
+            self.entry_description_var.set("")
+            self.entry_password_var.set("")
+            self.entry_username_var.set("")
+        else:
+            self.message.config(text="Error! No data selected")
+
+    def generate_entry_password(self):
+        self.entry_password_var.set(str(uuid.uuid4())[:10])
 
     def copy_to_clipboard(self, variable):
         pyperclip.copy(variable)
@@ -402,7 +495,7 @@ class TimerFrame(ttk.Frame):
         super().__init__(master)
         self.master = master
         minutes_to_logout = self.master.app_config.get("logout", 10)
-        self.logout_time = time.time()+minutes_to_logout*60
+        self.logout_time = time.time() + minutes_to_logout * 60
         self.time_text = ttk.StringVar(self, "")
         self.time_label = ttk.Button(
             self,
@@ -420,7 +513,7 @@ class TimerFrame(ttk.Frame):
             return
 
         time_var = int(self.logout_time - time.time())
-        self.time_text.set(f"Time: {time_var//60} min")
+        self.time_text.set(f"Time: {time_var // 60} min")
 
         if time_var > 0:
             self.after(10000, self.counter)  # 10000 (=10 second resolution)
@@ -435,16 +528,16 @@ class TimerFrame(ttk.Frame):
 
     def refresh_counter(self, new_time=None):
         if new_time:
-            self.logout_time = time.time() + new_time*60
+            self.logout_time = time.time() + new_time * 60
         else:
-            self.logout_time = time.time() + self.master.app_config.get("logout", 10)*60
+            self.logout_time = time.time() + self.master.app_config.get("logout", 10) * 60
 
         if self.run_counter == False:
             self.start_counter()
             return
 
         time_var = int(self.logout_time - time.time())
-        self.time_text.set(f"Time: {time_var//60} min")
+        self.time_text.set(f"Time: {time_var // 60} min")
 
     def stop_counter(self):
         self.time_text.set("")
@@ -526,11 +619,22 @@ class AddDataPage(SubPage):
         self.description = ttk.StringVar(value="")
         self.username = ttk.StringVar(value="")
         self.password = ttk.StringVar(value="")
+        self.show_btn = create_button(
+            "Show",
+            lambda: self.show_password()
+        )
+        self.generate_btn = create_button(
+            "Generate",
+            lambda: self.generate_entry_password()
+        )
 
         self.create_form_entry(self, "Description", self.description)
         self.create_form_entry(self, "Username", self.username)
-        self.create_form_entry(
-            self, "Password", self.password, type_password=True)
+        self.pass_entry = self.create_form_entry(self, "Password", self.password,
+                                                 type_password=True,
+                                                 buttons=[
+                                                     self.show_btn, self.generate_btn
+                                                 ])
         self.create_buttonbox()
 
     def on_submit(self):
@@ -550,6 +654,14 @@ class AddDataPage(SubPage):
 
     def on_cancel(self):
         self.switch_page_callback(DataPanel)
+
+    def generate_entry_password(self):
+        self.password.set(str(uuid.uuid4())[:10])
+
+    def show_password(self):
+        current_show_state = self.pass_entry.cget("show")
+        new_show_state = "" if current_show_state == "*" else "*"
+        self.pass_entry.config(show=new_show_state)
 
 
 class ChangeMasterPasswordPage(SubPage):
@@ -725,7 +837,8 @@ class BackupDataPage(SubPage):
             return
 
         choise = self.confirm_choice(
-            "Current database will be overwritten! Are you sure you want to restore your old database?", "Confirm database restore")
+            "Current database will be overwritten! Are you sure you want to restore your old database?",
+            "Confirm database restore")
         if choise != "Yes":
             return
 
