@@ -22,15 +22,27 @@ from handle_data import (
 from ttkbootstrap.scrolled import ScrolledFrame
 from ttkbootstrap.dialogs import Messagebox
 import pyperclip
+import threading
+import time
 
 ERROR_MSG_TIME = 5000
+SUCCESS_MSG_TIME = 3000
 
 
-def create_button(text, call_back):
-    btn = ttk.Button(
-        text=text,
-        command=call_back
-    )
+def create_button(text, call_back, photo=None):
+    if photo:
+        img = ttk.PhotoImage(file=photo).subsample(2)
+        btn = ttk.Button(
+            image=img,
+            command=call_back,
+            bootstyle="info"
+        )
+        btn.image = img
+    else:
+        btn = ttk.Button(
+            text=text,
+            command=call_back
+        )
     return btn
 
 
@@ -164,6 +176,8 @@ class LoginPage(SubPage):
         if self.master.key:
             self.master.navigation.set_navbar_status("")
             self.show_data_page()
+            if self.master.app_config.get("logout", None) != -1:
+                self.master.navigation.timer_frame.start_counter()
             return
 
         error_msg = "Wrong username or password!"
@@ -190,16 +204,20 @@ class PaginationFrame(ttk.Frame):
         self.info_label = ttk.Label(label_frame, text="")
         self.info_label.pack(side=bconst.LEFT, padx=10)
         label_frame.pack(anchor="w")
+        style_str = "info"
         prev = ttk.Button(
             self,
             text="prev",
-            command=lambda: self.paginate(self.current_page.get(), -1)
+            command=lambda: self.paginate(self.current_page.get(), -1),
+            bootstyle=style_str,
+
         )
         prev.pack(side=bconst.LEFT, padx=x_pad, pady=y_pad)
         next = ttk.Button(
             self,
             text="next",
-            command=lambda: self.paginate(self.current_page.get(), +1)
+            command=lambda: self.paginate(self.current_page.get(), +1),
+            bootstyle=style_str,
         )
         next.pack(side=bconst.LEFT, padx=x_pad, pady=y_pad)
         self.page_entry = ttk.Entry(
@@ -208,7 +226,8 @@ class PaginationFrame(ttk.Frame):
         go = ttk.Button(
             self,
             text="go",
-            command=lambda: self.paginate(self.current_page.get(), 0)
+            command=lambda: self.paginate(self.current_page.get(), 0),
+            bootstyle=style_str,
         )
         go.pack(side=bconst.LEFT, padx=x_pad, pady=y_pad)
 
@@ -243,7 +262,9 @@ class DataPanel(SubPage):
         self.search_frame = ttk.Frame(self)
         self.search_frame.pack(side=bconst.TOP, fill=bconst.X)
         self.search_var = ttk.StringVar(value="")
-        btn = create_button("search", self.search)
+        btn = create_button("search", self.search, photo="img/search.png")
+        ToolTip(btn, "Search")
+
         self.create_form_entry(self.search_frame, "Search",
                                self.search_var, anchor="w", buttons=[btn])
 
@@ -257,11 +278,14 @@ class DataPanel(SubPage):
         self.details_frame.pack(side=bconst.LEFT, padx=30)
         anchor = "w"
 
+        copy_tooltip = "Copy to clipboard"
         self.entry_description_var = ttk.StringVar(value="")
         copy_desc_btn = create_button(
             "copy",
-            lambda: self.copy_to_clipboard(self.entry_description_var.get())
+            lambda: self.copy_to_clipboard(self.entry_description_var.get()),
+            photo="img/copy.png"
         )
+        ToolTip(copy_desc_btn, copy_tooltip)
         self.create_form_entry(
             self.details_frame,
             "Description",
@@ -273,8 +297,11 @@ class DataPanel(SubPage):
         self.entry_username_var = ttk.StringVar(value="")
         copy_uname_btn = create_button(
             "copy",
-            lambda: self.copy_to_clipboard(self.entry_username_var.get())
+            lambda: self.copy_to_clipboard(self.entry_username_var.get()),
+            photo="img/copy.png"
         )
+        ToolTip(copy_uname_btn, copy_tooltip)
+
         self.create_form_entry(
             self.details_frame,
             "Username", self.entry_username_var,
@@ -285,12 +312,18 @@ class DataPanel(SubPage):
         self.entry_password_var = ttk.StringVar(value="")
         copy_passw_btn = create_button(
             "copy",
-            lambda: self.copy_to_clipboard(self.entry_password_var.get())
+            lambda: self.copy_to_clipboard(self.entry_password_var.get()),
+            photo="img/copy.png"
         )
+        ToolTip(copy_passw_btn, copy_tooltip)
+
         toggle_show_passw_btn = create_button(
             "show",
-            lambda: self.toggle_show_entry_password()
+            lambda: self.toggle_show_entry_password(),
+            photo="img/eye.png"
         )
+        ToolTip(toggle_show_passw_btn, "Show password")
+
         self.password_entry = self.create_form_entry(
             self.details_frame,
             "Password",
@@ -364,6 +397,61 @@ class DataPanel(SubPage):
         self.paginator.update_info()
 
 
+class TimerFrame(ttk.Frame):
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+        minutes_to_logout = self.master.app_config.get("logout", 10)
+        self.logout_time = time.time()+minutes_to_logout*60
+        self.time_text = ttk.StringVar(self, "")
+        self.time_label = ttk.Button(
+            self,
+            textvariable=self.time_text,
+            command=self.refresh_counter,
+            style="time_button.Link.TButton",
+        )
+        self.time_label.pack(side=bconst.LEFT)
+        ToolTip(self.time_label,
+                "Logout after time expired. Refresh time by clicking")
+        self.run_counter = False
+
+    def counter(self):
+        if self.run_counter == False:
+            return
+
+        time_var = int(self.logout_time - time.time())
+        self.time_text.set(f"Time: {time_var//60} min")
+
+        if time_var > 0:
+            self.after(10000, self.counter)  # 10000 (=10 second resolution)
+        else:
+            self.master.destroy()
+
+    def start_counter(self):
+        self.run_counter = True
+        self.counter_thread = threading.Thread(
+            target=self.counter, daemon=True)
+        self.counter_thread.start()
+
+    def refresh_counter(self, new_time=None):
+        if new_time:
+            self.logout_time = time.time() + new_time*60
+        else:
+            self.logout_time = time.time() + self.master.app_config.get("logout", 10)*60
+
+        if self.run_counter == False:
+            self.start_counter()
+            return
+
+        time_var = int(self.logout_time - time.time())
+        self.time_text.set(f"Time: {time_var//60} min")
+
+    def stop_counter(self):
+        self.time_text.set("")
+        self.run_counter = False
+        self.counter_thread.join()
+
+
 class Navigation(SubPage):
     def __init__(self, master, switch_page_callback):
         super().__init__(master, switch_page_callback)
@@ -376,7 +464,7 @@ class Navigation(SubPage):
         self.nav_buttons = []
         data_button = ttk.Button(
             self.master,
-            text="Data",
+            text="My Passwords",
             state=self.status.get(),
             command=lambda: self.switch_page_callback(DataPanel),
             style=style_str,
@@ -386,7 +474,7 @@ class Navigation(SubPage):
 
         add_button = ttk.Button(
             self.master,
-            text="Add",
+            text="Add New",
             state=self.status.get(),
             command=lambda: self.switch_page_callback(AddDataPage),
             style=style_str,
@@ -394,45 +482,34 @@ class Navigation(SubPage):
         add_button.pack(side=bconst.LEFT, padx=x_pad, pady=y_pad)
         self.nav_buttons.append(add_button)
 
-        options_button = ttk.Button(
+        menu_list = [
+            ("Options", OptionsPage),
+            ("Backup", BackupDataPage),
+            ("Change Password", ChangeMasterPasswordPage),
+            ("Logout", lambda: self.master.destroy())
+        ]
+        menu_btn = ttk.Menubutton(
             self.master,
-            text="Options",
+            text="Menu",
+            direction="right",
             state=self.status.get(),
-            command=lambda: self.switch_page_callback(OptionsPage),
-            style=style_str,
+            style=style_str
         )
-        options_button.pack(side=bconst.LEFT, padx=x_pad, pady=y_pad)
-        self.nav_buttons.append(options_button)
+        menu_btn.pack(side=bconst.RIGHT, padx=20, pady=5)
+        inside_menu = ttk.Menu(menu_btn)
+        for x in menu_list:
+            btn_func = x[1] if x[0] == "Logout" else lambda x=x: self.switch_page_callback(
+                x[1])
+            inside_menu.add_radiobutton(
+                label=x[0],
+                command=btn_func
 
-        password_change_btn = ttk.Button(
-            self.master,
-            text="Change password",
-            state=self.status.get(),
-            command=lambda: self.switch_page_callback(
-                ChangeMasterPasswordPage),
-            style=style_str,
-        )
-        password_change_btn.pack(side=bconst.LEFT, padx=x_pad, pady=y_pad)
-        self.nav_buttons.append(password_change_btn)
+            )
+        menu_btn["menu"] = inside_menu
+        self.nav_buttons.append(menu_btn)
 
-        backup_btn = ttk.Button(
-            self.master,
-            text="Backups",
-            state=self.status.get(),
-            command=lambda: self.switch_page_callback(BackupDataPage),
-            style=style_str,
-        )
-        backup_btn.pack(side=bconst.LEFT, padx=x_pad, pady=y_pad)
-        self.nav_buttons.append(backup_btn)
-
-        logout_button = ttk.Button(
-            self.master,
-            text="Logout",
-            state=self.status.get(),
-            style=style_str,
-        )
-        logout_button.pack(side=bconst.RIGHT, padx=x_pad, pady=y_pad)
-        self.nav_buttons.append(logout_button)
+        self.timer_frame = TimerFrame(self.master)
+        self.timer_frame.pack(side=bconst.RIGHT, padx=x_pad, pady=y_pad)
 
     def set_navbar_status(self, status):
         for el in self.nav_buttons:
@@ -636,7 +713,7 @@ class BackupDataPage(SubPage):
             success, error = copy_db_to_location(file_path)
             if success:
                 self.label.config(text="Database copied successfully!")
-                self.after(5000, lambda: self.label.config(
+                self.after(SUCCESS_MSG_TIME, lambda: self.label.config(
                     text=self.default_label_txt))
             elif error:
                 self.on_error(error)
@@ -675,8 +752,10 @@ class BackupDataPage(SubPage):
 class OptionsPage(SubPage):
     def __init__(self, master, switch_page_callback):
         super().__init__(master, switch_page_callback)
-        self.config = read_config()
-        self.label = ttk.Label(self, text="Options", font=("Helvetica", 12))
+
+        self.options_text = "Options"
+        self.label = ttk.Label(
+            self, text=self.options_text, font=("Helvetica", 12))
         self.label.pack()
 
         options_frame = ttk.Frame(self)
@@ -697,7 +776,8 @@ class OptionsPage(SubPage):
         self.theme_btn.pack(anchor="w", pady=20)
 
         # Autologout time
-        self.logout_time = ttk.IntVar(self, self.config.get("logout", 10))
+        self.logout_time = ttk.IntVar(
+            self, self.master.app_config.get("logout", 10))
         logout_choices = [-1, 10, 15]
         logout_label = ttk.Label(left_options, text="Select logout time (min)")
         logout_label.pack(anchor="w", pady=10)
@@ -713,7 +793,7 @@ class OptionsPage(SubPage):
 
         # Pagination
         self.pagination_amount = ttk.IntVar(
-            self, self.config.get("pagination", 200))
+            self, self.master.app_config.get("pagination", 200))
         pagination_label = ttk.Label(
             left_options, text="How many passwords per page")
         pagination_label.pack(pady=10)
@@ -731,7 +811,7 @@ class OptionsPage(SubPage):
         self.min_password_length = 1
         self.max_password_length = 128
         self.random_password_length = ttk.IntVar(
-            self, self.config.get("random_password_length", 30))
+            self, self.master.app_config.get("random_password_length", 30))
         self.random_password_length.trace_add(
             "write", self.set_random_password_length)
         password_label = ttk.Label(
@@ -752,19 +832,21 @@ class OptionsPage(SubPage):
     def toggle_theme(self):
         current = self.master._style.theme.name
         if current == "darkly":
-            self.master._style.theme_use("cosmo")
+            self.master._style.theme_use("litera")
         else:
             self.master._style.theme_use("darkly")
 
         self.master.activate_custom_styles()
 
     def select_logout_time(self):
-        print('select log time', self.logout_time.get())
-
-        # TODO: connect to autologout feature
+        new_time = self.logout_time.get()
+        if new_time == -1:
+            self.master.navigation.timer_frame.stop_counter()
+        else:
+            self.master.navigation.timer_frame.refresh_counter(
+                new_time=new_time)
 
     def select_pagination(self):
-        print('select pagination', self.pagination_amount.get())
         self.master.pagination_limit = self.pagination_amount.get()
 
     def set_random_password_length(self, *args):
@@ -789,20 +871,37 @@ class OptionsPage(SubPage):
             "ui_theme": ui_theme,
         })
         self.master.app_config = read_config()
+        self.label.config(text="Options saved!")
+        self.after(SUCCESS_MSG_TIME, lambda: self.label.config(
+            text=self.options_text))
 
     def on_cancel(self):
         """
         Return the config settings.
         """
-        config_theme = self.config.get("ui_theme", "darkly")
+        config_theme = self.master.app_config.get("ui_theme", "darkly")
         self.theme_var.set(0 if config_theme == "darkly" else 1)
         self.master._style.theme_use(config_theme)
         self.master.activate_custom_styles()
-        self.logout_time.set(self.config.get("logout", 10))
-        self.master.pagination_limit = self.config.get("pagination", 200)
-        self.pagination_amount.set(self.config.get("pagination", 200))
+
+        config_logout_time = self.master.app_config.get("logout", 10)
+
+        if config_logout_time == -1 and self.logout_time.get() != -1:
+            self.master.navigation.timer_frame.stop_counter()
+        if self.logout_time.get() == -1 and config_logout_time != -1:
+            self.master.navigation.timer_frame.refresh_counter()
+
+        self.logout_time.set(config_logout_time)
+        self.master.pagination_limit = self.master.app_config.get(
+            "pagination", 200)
+        self.pagination_amount.set(
+            self.master.app_config.get("pagination", 200))
         self.random_password_length.set(
-            self.config.get("random_password_length", 30))
+            self.master.app_config.get("random_password_length", 30))
+
+        self.label.config(text="Options returned to your saved values!")
+        self.after(SUCCESS_MSG_TIME, lambda: self.label.config(
+            text=self.options_text))
 
 
 class MainApplication(ttk.Window):
@@ -823,7 +922,9 @@ class MainApplication(ttk.Window):
 
         self.page_frame = ttk.Frame(self)
         self.page_frame.pack(side=bconst.BOTTOM, fill="both", expand=True)
-
+        separator = ttk.Separator(
+            self.page_frame, orient="horizontal")
+        separator.pack(side=bconst.TOP, fill="x", pady=10)
         self.navigation = Navigation(self, self.switch_page)
         self.navigation.pack(in_=self.navigation_frame)
 
@@ -848,3 +949,5 @@ class MainApplication(ttk.Window):
     def activate_custom_styles(self):
         self._style.configure("nav_button.Link.TButton",
                               font=("Helvetica", 12))
+        self._style.configure("time_button.Link.TButton",
+                              font=("Helvetica", 9))
