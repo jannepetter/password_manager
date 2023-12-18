@@ -34,13 +34,20 @@ SUCCESS_MSG_TIME = 3000
 
 def create_button(text, call_back, photo=None, bootstyle="info"):
     if photo:
-        img = ttk.PhotoImage(file=photo).subsample(2)
-        btn = ttk.Button(
-            image=img,
+        try:
+            img = ttk.PhotoImage(file=photo).subsample(2)
+            btn = ttk.Button(
+                image=img,
+                command=call_back,
+                bootstyle=bootstyle,
+            )
+            btn.image = img
+        except Exception:
+            btn = ttk.Button(
+            text=text,
             command=call_back,
             bootstyle=bootstyle,
         )
-        btn.image = img
     else:
         btn = ttk.Button(
             text=text,
