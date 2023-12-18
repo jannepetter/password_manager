@@ -1,5 +1,3 @@
-import uuid
-
 import ttkbootstrap as ttk
 import ttkbootstrap.constants as bconst
 from ttkbootstrap.tooltip import ToolTip
@@ -21,7 +19,8 @@ from handle_data import (
     read_config,
     save_config,
     delete_data,
-    edit_data
+    edit_data,
+    generate_random_password,
 )
 from ttkbootstrap.scrolled import ScrolledFrame
 from ttkbootstrap.dialogs import Messagebox
@@ -33,19 +32,20 @@ ERROR_MSG_TIME = 5000
 SUCCESS_MSG_TIME = 3000
 
 
-def create_button(text, call_back, photo=None):
+def create_button(text, call_back, photo=None, bootstyle="info"):
     if photo:
         img = ttk.PhotoImage(file=photo).subsample(2)
         btn = ttk.Button(
             image=img,
             command=call_back,
-            bootstyle="info"
+            bootstyle=bootstyle,
         )
         btn.image = img
     else:
         btn = ttk.Button(
             text=text,
-            command=call_back
+            command=call_back,
+            bootstyle=bootstyle,
         )
     return btn
 
@@ -133,7 +133,7 @@ class LoginPage(SubPage):
                 self, "Confirm password", self.password_confirm, True)
             help_text = f"""
             Select your username and password\n
-            Password min lenght {MIN_MASTER_PASSWORD_LENGTH}. Uppercase, lowercase, number and special char required.
+            Password min length {MIN_MASTER_PASSWORD_LENGTH}. Uppercase, lowercase, number and special char required.
             """
             if not self.master.use_validation:
                 # remove when finished product
@@ -267,8 +267,7 @@ class DataPanel(SubPage):
         self.search_frame = ttk.Frame(self)
         self.search_frame.pack(side=bconst.TOP, fill=bconst.X)
         self.search_var = ttk.StringVar(value="")
-        # btn = create_button("search", self.search, photo="img/search.png")
-        btn = create_button("search", self.search)
+        btn = create_button("search", self.search,"img/search.png")
         ToolTip(btn, "Search")
 
         self.create_form_entry(self.search_frame, "Search",
@@ -292,7 +291,7 @@ class DataPanel(SubPage):
         copy_desc_btn = create_button(
             "copy",
             lambda: self.copy_to_clipboard(self.entry_description_var.get()),
-            # photo="img/copy.png"
+            photo="img/copy.png"
         )
         ToolTip(copy_desc_btn, copy_tooltip)
         self.create_form_entry(
@@ -307,7 +306,7 @@ class DataPanel(SubPage):
         copy_uname_btn = create_button(
             "copy",
             lambda: self.copy_to_clipboard(self.entry_username_var.get()),
-            # photo="img/copy.png"
+            photo="img/copy.png"
         )
         ToolTip(copy_uname_btn, copy_tooltip)
 
@@ -322,27 +321,35 @@ class DataPanel(SubPage):
         copy_passw_btn = create_button(
             "copy",
             lambda: self.copy_to_clipboard(self.entry_password_var.get()),
-            # photo="img/copy.png"
+            photo="img/copy.png"
         )
         ToolTip(copy_passw_btn, copy_tooltip)
 
         toggle_show_passw_btn = create_button(
             "show",
             lambda: self.toggle_show_entry_password(),
-            # photo="img/eye.png"
+            photo="img/eye.png"
         )
         ToolTip(toggle_show_passw_btn, "Show password")
         generate_password_btn = create_button(
             "Generate",
-            lambda: self.generate_entry_password()
+            lambda: self.generate_entry_password(),
+            photo="img/arrows.png",
         )
+        random_password_length = self.master.app_config.get("random_password_length",25)
+        ToolTip(
+            generate_password_btn, 
+            f"Generate random password with length {random_password_length}. You can change the length from options.")
+
         update_password_btn = create_button(
             "Update",
-            lambda: self.update_entry()
+            lambda: self.update_entry(),
+            bootstyle="success",
         )
         delete_password_btn = create_button(
             "Delete",
-            lambda: self.delete_entry()
+            lambda: self.delete_entry(),
+            bootstyle="danger",
         )
 
         self.password_entry = self.create_form_entry(
@@ -400,14 +407,12 @@ class DataPanel(SubPage):
         self.entry_username_var.set(username)
         self.entry_password_var.set(password)
 
-    def confirm_choice(self, message, title):
-        return Messagebox.yesno(message=message, title=title, parent=self)
 
     def delete_entry(self):
         if self.current_index != -1:
             choice = self.confirm_choice(
-                message="Confirm Deleting your Entry",
-                title="Confirm Deletion"
+                message="Confirm Delete?",
+                title="Confirm Delete"
             )
             if choice == "Yes":
                 entry_id = self.data_list[self.current_index].get('id')
@@ -432,31 +437,32 @@ class DataPanel(SubPage):
     def update_entry(self):
         if self.current_index != -1:
             entry_id = self.data_list[self.current_index].get('id')
-            edit_data(
-                self.master.key, entry_id,
-                self.entry_description_var.get(),
-                self.entry_password_var.get(),
-                self.entry_username_var.get()
-            )
-            self.data_list = []
-            for child in self.button_frame.winfo_children():
-                child.destroy()
-            self.data_list, count = read_data(
-                self.master.key,
-                limit=self.master.pagination_limit,
-            )
-            self.paginator.total_count = count
-            self.create_description_list()
-            self.paginator.update_info()
-            self.current_index = -1
-            self.entry_description_var.set("")
-            self.entry_password_var.set("")
-            self.entry_username_var.set("")
+            choice = self.confirm_choice("Confirm update?","Confirm update")
+            if choice == "Yes":
+                edit_data(
+                    self.master.key, entry_id,
+                    self.entry_description_var.get(),
+                    self.entry_password_var.get(),
+                    self.entry_username_var.get()
+                )
+                self.data_list[self.current_index]= {
+                    "id":entry_id,
+                    "description":self.entry_description_var.get(),
+                    "username":self.entry_username_var.get(),
+                    "password":self.entry_password_var.get(),
+                }
+                child = self.button_frame.winfo_children()[self.current_index]
+                child.configure(text=self.entry_description_var.get())
+            return
         else:
             self.message.config(text="Error! No data selected")
 
     def generate_entry_password(self):
-        self.entry_password_var.set(str(uuid.uuid4())[:10])
+        self.entry_password_var.set(
+            generate_random_password(
+                self.master.app_config.get("random_password_length",25)
+                )
+        ) 
 
     def copy_to_clipboard(self, variable):
         pyperclip.copy(variable)
@@ -621,16 +627,29 @@ class AddDataPage(SubPage):
         self.password = ttk.StringVar(value="")
         self.show_btn = create_button(
             "Show",
-            lambda: self.show_password()
+            lambda: self.show_password(),
+            photo="img/eye.png",
         )
+        ToolTip(self.show_btn, "Show password")
+
         self.generate_btn = create_button(
             "Generate",
-            lambda: self.generate_entry_password()
-        )
+            lambda: self.generate_entry_password(),
+            photo="img/arrows.png",
 
-        self.create_form_entry(self, "Description", self.description)
-        self.create_form_entry(self, "Username", self.username)
-        self.pass_entry = self.create_form_entry(self, "Password", self.password,
+        )
+        random_password_length = self.master.app_config.get("random_password_length",25)
+        ToolTip(
+            self.generate_btn, 
+            f"Generate random password with length {random_password_length}. You can change the length from options.",
+            )
+
+        add_frame = ttk.Frame(self)
+        add_frame.pack()
+
+        self.create_form_entry(add_frame, "Description", self.description,anchor="w",)
+        self.create_form_entry(add_frame, "Username", self.username,anchor="w",)
+        self.pass_entry = self.create_form_entry(add_frame, "Password", self.password,anchor="w",
                                                  type_password=True,
                                                  buttons=[
                                                      self.show_btn, self.generate_btn
@@ -656,7 +675,7 @@ class AddDataPage(SubPage):
         self.switch_page_callback(DataPanel)
 
     def generate_entry_password(self):
-        self.password.set(str(uuid.uuid4())[:10])
+        self.password.set(generate_random_password(self.master.app_config.get("random_password_length",25)))
 
     def show_password(self):
         current_show_state = self.pass_entry.cget("show")
@@ -777,7 +796,7 @@ class BackupDataPage(SubPage):
 
         page_frame = ttk.Frame(self, height=40, width=20)
         page_frame.pack(side=bconst.RIGHT, pady=10, padx=10)
-        self.default_label_txt = "Create or restore a backup from your database."
+        self.default_label_txt = "Create a backup from your database."
         self.label = ttk.Label(page_frame, text=self.default_label_txt)
         self.label.pack(anchor="w")
         self.error_label = ttk.Label(page_frame, text="", foreground="red")
@@ -892,7 +911,7 @@ class OptionsPage(SubPage):
         self.logout_time = ttk.IntVar(
             self, self.master.app_config.get("logout", 10))
         logout_choices = [-1, 10, 15]
-        logout_label = ttk.Label(left_options, text="Select logout time (min)")
+        logout_label = ttk.Label(left_options, text="Select logout time")
         logout_label.pack(anchor="w", pady=10)
         for choice in logout_choices:
             text_val = "Never" if choice == -1 else str(choice) + " min"
@@ -1020,7 +1039,7 @@ class OptionsPage(SubPage):
 class MainApplication(ttk.Window):
     def __init__(self, app_config):
         # switch for development to bypass validation. Remove when product finished
-        self.use_validation = False
+        self.use_validation = True
         self.app_config = app_config
         self.pagination_limit = app_config.get("pagination", 200)
         theme = app_config.get("ui_theme", "darkly")
@@ -1057,6 +1076,7 @@ class MainApplication(ttk.Window):
         self.show_page(page_class)
 
     def on_close(self):
+        self.key = None
         self.destroy()
 
     def activate_custom_styles(self):

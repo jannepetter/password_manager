@@ -307,7 +307,6 @@ def change_login_password(username, password, new_username, new_password):
         for el in original_data:
 
             init_vector = os.urandom(VECTOR_LENGTH)
-            # id = el["id"]
             description = el["description"]
             password = el["password"]
             username = el["username"]
@@ -341,7 +340,7 @@ def change_login_password(username, password, new_username, new_password):
 
         # check that each entry matches the old when decrypted with the new key
         for i in range(len(original_data)):
-            assert original_data[i]["id"] == data[i]["id"], "id is not the same"
+            # dont check id, data might have been deleted and ids get reseted during table deletion
             assert original_data[i]["description"] == data[i]["description"], "description is not the same"
             assert original_data[i]["password"] == data[i]["password"], "password is not the same"
             assert original_data[i]["username"] == data[i]["username"], "username is not the same"
